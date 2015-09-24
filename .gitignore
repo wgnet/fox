@@ -5,3 +5,4 @@ logs
 ebin
 TAGS
 .rebar
+erl_crash.dump

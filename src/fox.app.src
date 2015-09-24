@@ -1,10 +1,15 @@
 %% -*- mode: Erlang;-*-
 {application, fox,
  [
-  {description, ""},
-  {vsn, "1"},
+  {description, "Client lib for RabbitMQ"},
+  {vsn, "0.1"},
   {registered, []},
-  {applications, [kernel, stdlib]},
+  {applications, [kernel, stdlib, amqp_client]},
   {mod, {fox_app, []}},
-  {env, []}
+  {env, [
+         {connection_pool_size, 5},
+         {connection_timeout, 10000},
+         {max_reconnect_timeout, 5000},
+         {min_reconnect_timeout, 100}
+        ]}
  ]}.
