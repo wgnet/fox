@@ -1,4 +1,4 @@
-ERL_RUN_ARGS:=+pc unicode -pa ebin -boot start_sasl -s fox test_run
+ERL_RUN_ARGS:=+pc unicode -pa ebin -config fox -boot start_sasl -s fox test_run
 
 compile:
 	rebar compile skip_deps=true

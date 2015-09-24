@@ -1,3 +1,5 @@
+-type(connection_name() :: binary() | string() | atom()).
+
 -define(info(Str), error_logger:info_msg(Str)).
 -define(info(Format, Params), error_logger:info_msg(Format, Params)).
 

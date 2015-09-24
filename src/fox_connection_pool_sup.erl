@@ -1,7 +1,7 @@
 -module(fox_connection_pool_sup).
 -behaviour(supervisor).
 
--export([start_link/0, init/1, start_pool/2]).
+-export([start_link/0, init/1, start_pool/3]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -13,22 +13,16 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 
--spec start_pool(#amqp_params_network{}, integer()) -> ok.
-start_pool(#amqp_params_network{host = Host,
-                                port = Port,
-                                virtual_host = VHost,
-                                username = Username} = Params, PoolSize) ->
-    ?info("fox start pool ~s@~s:~p~s of size ~p", [Username, Host, Port, VHost, PoolSize]),
-    %% TODO run fox_connection_sup instead
-    Spec = fun(Id) ->
-                   {{some_worker, Id},
-                    {some_worker, start_link, [Params]},
+-spec start_pool(atom(), #amqp_params_network{}, integer()) -> ok.
+start_pool(PoolName, Params, PoolSize) ->
+    ConnectionPoolSup =
+                   {{fox_connection_sup, PoolName},
+                    {fox_connection_sup, start_link, [PoolName, Params, PoolSize]},
                     permanent,
                     2000,
                     worker,
-                    [some_worker]}
-           end,
-    [supervisor:start_child(?MODULE, Spec(Id)) || Id <- lists:seq(1, PoolSize)],
+                    [fox_connection_sup]},
+    supervisor:start_child(?MODULE, ConnectionPoolSup),
     ok.
 
 
