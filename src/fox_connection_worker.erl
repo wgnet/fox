@@ -11,6 +11,7 @@
 
 -record(state, {
           connection :: pid(),
+          connection_ref :: reference(),
           params_network :: #amqp_params_network{},
           num_channels = 0 :: non_neg_integer(),
           reconnect_attempt = 0 :: non_neg_integer()
@@ -39,13 +40,14 @@ init(Params) ->
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call(stop, _From, #state{connection = Connection, params_network = Params} = State) ->
+handle_call(stop, _From, #state{connection = Connection, connection_ref = Ref,
+                                params_network = Params} = State) ->
     error_logger:info_msg("fox_connection_worker close connection ~s",
                           [fox_utils:params_network_to_str(Params)]),
     case Connection of
         undefined -> do_nothing;
         Pid ->
-            %% TODO demonitor
+            erlang:demonitor(Ref, [flush]),
             try
                 amqp_connection:close(Pid)
             catch
@@ -67,13 +69,15 @@ handle_cast(Any, State) ->
 
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
-handle_info(connect, #state{params_network = Params, reconnect_attempt = Attempt} = State) ->
+handle_info(connect, #state{connection = undefined, connection_ref = undefined,
+                            params_network = Params, reconnect_attempt = Attempt} = State) ->
     case amqp_connection:start(Params) of
         {ok, Connection} ->
-            %% TODO monitor connection
+            Ref = erlang:monitor(process, Connection),
             error_logger:info_msg("fox_connection_worker connected to ~s",
                                   [fox_utils:params_network_to_str(Params)]),
-            {noreply, State#state{connection = Connection, reconnect_attempt = 0}};
+            {noreply, State#state{connection = Connection, connection_ref = Ref,
+                                  reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("fox_connection_worker could not connect to ~s ~p",
                                    [fox_utils:params_network_to_str(Params), Reason]),
@@ -82,8 +86,15 @@ handle_info(connect, #state{params_network = Params, reconnect_attempt = Attempt
             Timeout = herd_reconnect:exp_backoff(Attempt, MinTimeout, MaxTimeout),
             error_logger:warning_msg("fox_connection_worker reconnect after ~p attempt ~p", [Timeout, Attempt]),
             erlang:send_after(Timeout, self(), connect),
-            {noreply, State#state{connection = undefined, reconnect_attempt = Attempt + 1}}
+            {noreply, State#state{connection = undefined, connection_ref = undefined,
+                                  reconnect_attempt = Attempt + 1}}
     end;
+
+handle_info({'DOWN', Ref, process, Connection, Reason},
+            #state{connection = Connection, connection_ref = Ref} = State) ->
+    error_logger:error_msg("fox_connection_worker, connection is DOWN: ~p", [Reason]),
+    self() ! connect,
+    {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),

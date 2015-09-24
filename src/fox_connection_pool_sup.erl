@@ -17,7 +17,7 @@ start_link() ->
 
 -spec start_pool(atom(), #amqp_params_network{}, integer()) -> ok.
 start_pool(PoolName, Params, PoolSize) ->
-    ?info("fox start pool ~p ~s of size ~p",
+    error_logger:info_msg("fox start pool ~p ~s of size ~p",
           [PoolName, fox_utils:params_network_to_str(Params), PoolSize]),
     ConnectionPoolSup = {{fox_connection_sup, PoolName},
                          {fox_connection_sup, start_link, [PoolName, Params, PoolSize]},
@@ -35,7 +35,7 @@ init(_Args) ->
 
 -spec stop_pool(atom()) -> ok | {error, term()}.
 stop_pool(PoolName) ->
-    ?info("fox stop pool ~p", [PoolName]),
+    error_logger:info_msg("fox stop pool ~p", [PoolName]),
     ChildId = {fox_connection_sup, PoolName},
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} ->

@@ -1,4 +1,4 @@
--module(some_worker).
+-module(fox_channel_worker).
 -behavior(gen_server).
 
 -export([start_link/1]).
@@ -18,7 +18,7 @@ start_link(Params) ->
 
 -spec init(gs_args()) -> gs_init_reply().
 init(Params) ->
-    ?info("some_worker:init with params:~p", [Params]),
+    ?info("fox_channel_worker:init with params:~p", [Params]),
     {ok, no_state}.
 
 

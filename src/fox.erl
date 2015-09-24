@@ -59,7 +59,6 @@ test_run() ->
     create_connection_pool("pool_2", Params#{virtual_host => <<"/test">>}),
 
     timer:sleep(1000),
-    R1 = close_connection_pool("pool_2"),
-    ?info("R1: ~p", [R1]),
+    ok = close_connection_pool("pool_2"),
 
     ok.

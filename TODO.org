@@ -1,4 +1,4 @@
-* 1й уровень -- connection
+* DONE 1й уровень -- connection
   + app, sup
     + connection_pool_sup
       + connection_sup (register with ConnectionName, run Num connection_worker)
@@ -8,13 +8,7 @@
   + connect
   + reconnect
   + close connection
-  - monitor connection
-
-** АПИ 1-го уровня:
-  + validate_network_params(#amqp_network_params{}) -> boolean()
-  + create_connection_pool(ConnectionName, #amqp_network_params{} | map()) -> ok
-  - close_connection_pool(ConnectionName)
-
+  + monitor connection
 
 * 2й уровень -- channel
   - channel_sup (simple_one_for_one), run channel_worker
