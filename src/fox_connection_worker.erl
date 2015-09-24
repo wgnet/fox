@@ -1,4 +1,4 @@
--module(some_worker).
+-module(fox_connection_worker).
 -behavior(gen_server).
 
 -export([start_link/1]).
@@ -6,6 +6,16 @@
 
 -include("otp_types.hrl").
 -include("fox.hrl").
+-include_lib("amqp_client/include/amqp_client.hrl").
+
+
+-record(state, {
+          connection :: pid(),
+          params_network :: #amqp_params_network{},
+          num_channels = 0 :: non_neg_integer(),
+          reconnect_attempt = 0 :: non_neg_integer()
+         }).
+
 
 %%% module API
 
@@ -18,8 +28,9 @@ start_link(Params) ->
 
 -spec init(gs_args()) -> gs_init_reply().
 init(Params) ->
-    ?info("some_worker:init with params:~p", [Params]),
-    {ok, no_state}.
+    herd_rand:init_crypto(),
+    self() ! connect,
+    {ok, #state{params_network = Params}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
@@ -39,6 +50,20 @@ handle_cast(Any, State) ->
 
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
+handle_info(connect, #state{params_network = Params} = State) ->
+    case amqp_connection:start(Params) of
+        {ok, Connection} ->
+            %% TODO monitor connection
+            error_logger:info_msg("fox_connection_worker connected to ~s",
+                                  [fox_utils:params_network_to_str(Params)]),
+            {noreply, State#state{connection = Connection}};
+        {error, Reason} ->
+            error_logger:error_msg("fox_connection_worker could not connect to ~s ~p",
+                                   [fox_utils:params_network_to_str(Params), Reason]),
+            %% TODO reconnect
+            {noreply, State}
+    end;
+
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
     {noreply, State}.

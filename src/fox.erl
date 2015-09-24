@@ -23,7 +23,8 @@ create_connection_pool(ConnectionName, Params) when is_map(Params) ->
     create_connection_pool(ConnectionName, Params2);
 
 create_connection_pool(ConnectionName, Params) ->
-    ConnectionName2 = name_to_atom(ConnectionName),
+    %% TODO validate params types
+    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
     {ok, PoolSize} = application:get_env(fox, connection_pool_size),
     fox_connection_pool_sup:start_pool(ConnectionName2, Params, PoolSize),
     ok.
@@ -34,24 +35,14 @@ test_run() ->
     application:ensure_all_started(fox),
     Params1 = #{host => "localhost",
                 port => 5672,
-                virtual_host => "/",
-                username => "guest",
-                password => "guest"},
+                virtual_host => <<"/">>,
+                username => <<"guest">>,
+                password => <<"guest">>},
     create_connection_pool("test_pool", Params1),
     Params2 = #{host => "localhost",
                 port => 5672,
-                virtual_host => "/test",
-                username => "guest",
-                password => "guest"},
+                virtual_host => <<"/test">>,
+                username => <<"guest">>,
+                password => <<"guest">>},
     create_connection_pool("pool_2", Params2),
     ok.
-
-
-%% inner functions
-
--spec name_to_atom(connection_name()) -> atom().
-name_to_atom(Name) when is_binary(Name) ->
-    name_to_atom(erlang:binary_to_atom(Name, utf8));
-name_to_atom(Name) when is_list(Name) ->
-    name_to_atom(list_to_atom(Name));
-name_to_atom(Name) -> Name.

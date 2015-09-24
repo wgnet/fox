@@ -15,13 +15,10 @@ start_link() ->
 
 -spec start_pool(atom(), #amqp_params_network{}, integer()) -> ok.
 start_pool(PoolName, Params, PoolSize) ->
-    ConnectionPoolSup =
-                   {{fox_connection_sup, PoolName},
-                    {fox_connection_sup, start_link, [PoolName, Params, PoolSize]},
-                    permanent,
-                    2000,
-                    worker,
-                    [fox_connection_sup]},
+    ConnectionPoolSup = {{fox_connection_sup, PoolName},
+                         {fox_connection_sup, start_link, [PoolName, Params, PoolSize]},
+                         permanent, 2000, supervisor,
+                         [fox_connection_sup]},
     supervisor:start_child(?MODULE, ConnectionPoolSup),
     ok.
 

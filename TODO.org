@@ -1,32 +1,32 @@
 * 1й уровень -- connection
-  - app, sup
-    - connection_pool_sup
-      - connection_sup (register with ConnectionName, run Num connection_worker)
-    - channel_sup (simple_one_for_one), run channel_worker
-  - динамическое создание новых соединений и остановка их
+  + app, sup
+    + connection_pool_sup
+      + connection_sup (register with ConnectionName, run Num connection_worker)
+  + динамическое создание новых соединений и остановка их
     для каждого {ConnectionName, #amqp_network_params{}} нужно создать connection_sup
     и под ним несколько connection_worker
-  - каждый connection_worker обеспечивает reconnect для своего connection
-  - выбор соединений
+  + connect
+  - reconnect
+  - close connection
+
+** АПИ 1-го уровня:
+  - create_connection_pool(ConnectionName, #amqp_network_params{} | map(), NumConnections) -> ok
+  - close_connection_pool(ConnectionName)
+  - validate_network_params(#amqp_network_params{}) -> boolean()
+
+* 2й уровень -- channel
+  - channel_sup (simple_one_for_one), run channel_worker
+  - создание channel и channel_worker по требованию
     - по ConnectionName выбрать нужный connection_sup
     - для этого sup обойти все его connection_worker
       и выбрать тот, у кого меньше всего channel
       which_children(SupRef) -> [{Id, Child, Type, Modules}]
       Child - the pid of the corresponding child process, the atom restarting if the process is about to be restarted, or undefined if there is no such process.
-
-** АПИ 1-го уровня:
-  - validate_network_params(#amqp_network_params{}) -> boolean()
-  - create_connection_pool(ConnectionName, #amqp_network_params{} | map(), NumConnections) -> ok
-  - close_connection_pool(ConnectionName)
-
-* 2й уровень -- channel
-  - supervisor simple-one-for-one для запуска channel_worker
-  - создание channel и channel_worker по требованию
-    The consumer module for a channel is chosen when the channel is opened by
-    setting the second parameter to amqp_connection:open_channel/2. The
-    consumer module implements the amqp_gen_consumer behaviour and thus
-    implements functions to handle receiving basic.consume,
-    basic.consume_ok, basic.cancel, basic.cancel_ok methods as well as publishes.
+    - The consumer module for a channel is chosen when the channel is opened by
+      setting the second parameter to amqp_connection:open_channel/2. The
+      consumer module implements the amqp_gen_consumer behaviour and thus
+      implements functions to handle receiving basic.consume,
+      basic.consume_ok, basic.cancel, basic.cancel_ok methods as well as publishes.
   - хранить их внутри connection_worker
   - завершение channel_worker
 
