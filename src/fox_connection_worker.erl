@@ -50,18 +50,22 @@ handle_cast(Any, State) ->
 
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
-handle_info(connect, #state{params_network = Params} = State) ->
+handle_info(connect, #state{params_network = Params, reconnect_attempt = Attempt} = State) ->
     case amqp_connection:start(Params) of
         {ok, Connection} ->
             %% TODO monitor connection
             error_logger:info_msg("fox_connection_worker connected to ~s",
                                   [fox_utils:params_network_to_str(Params)]),
-            {noreply, State#state{connection = Connection}};
+            {noreply, State#state{connection = Connection, reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("fox_connection_worker could not connect to ~s ~p",
                                    [fox_utils:params_network_to_str(Params), Reason]),
-            %% TODO reconnect
-            {noreply, State}
+            {ok, MaxTimeout} = application:get_env(fox, max_reconnect_timeout),
+            {ok, MinTimeout} = application:get_env(fox, min_reconnect_timeout),
+            Timeout = herd_reconnect:exp_backoff(Attempt, MinTimeout, MaxTimeout),
+            error_logger:warning_msg("fox_connection_worker reconnect after ~p attempt ~p", [Timeout, Attempt]),
+            erlang:send_after(Timeout, self(), connect),
+            {noreply, State#state{reconnect_attempt = Attempt + 1}}
     end;
 
 handle_info(Request, State) ->

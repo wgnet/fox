@@ -13,6 +13,7 @@
 -spec validate_params_network(#amqp_params_network{} | map()) -> ok | {error, term()}.
 validate_params_network(Params) when is_map(Params) ->
     validate_params_network(fox_utils:map_to_params_network(Params));
+
 validate_params_network(Params) ->
     true = fox_utils:validate_params_network_types(Params),
     case amqp_connection:start(Params) of
@@ -36,6 +37,7 @@ create_connection_pool(ConnectionName, Params) ->
 -spec(test_run() -> ok).
 test_run() ->
     application:ensure_all_started(fox),
+    application:set_env(fox, connection_pool_size, 2),
 
     Params = #{host => "localhost",
                 port => 5672,
@@ -48,4 +50,5 @@ test_run() ->
 
     create_connection_pool("test_pool", Params),
     create_connection_pool("pool_2", Params#{virtual_host => <<"/test">>}),
+
     ok.
