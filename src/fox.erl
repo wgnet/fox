@@ -2,6 +2,7 @@
 
 -export([validate_params_network/1,
          create_connection_pool/2,
+         close_connection_pool/1,
          test_run/0]).
 
 -include("fox.hrl").
@@ -34,6 +35,12 @@ create_connection_pool(ConnectionName, Params) ->
     ok.
 
 
+-spec close_connection_pool(connection_name()) -> ok | {error, term()}.
+close_connection_pool(ConnectionName) ->
+    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
+    fox_connection_pool_sup:stop_pool(ConnectionName2).
+
+
 -spec(test_run() -> ok).
 test_run() ->
     application:ensure_all_started(fox),
@@ -50,5 +57,9 @@ test_run() ->
 
     create_connection_pool("test_pool", Params),
     create_connection_pool("pool_2", Params#{virtual_host => <<"/test">>}),
+
+    timer:sleep(1000),
+    R1 = close_connection_pool("pool_2"),
+    ?info("R1: ~p", [R1]),
 
     ok.

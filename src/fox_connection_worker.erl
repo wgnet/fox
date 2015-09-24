@@ -1,7 +1,7 @@
 -module(fox_connection_worker).
 -behavior(gen_server).
 
--export([start_link/1]).
+-export([start_link/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -24,6 +24,11 @@ start_link(Params) ->
     gen_server:start_link(?MODULE, Params, []).
 
 
+-spec stop(pid()) -> ok.
+stop(Pid) ->
+    gen_server:call(Pid, stop).
+
+
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
@@ -34,9 +39,21 @@ init(Params) ->
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call({some, _Data}, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State};
+handle_call(stop, _From, #state{connection = Connection, params_network = Params} = State) ->
+    error_logger:info_msg("fox_connection_worker close connection ~s",
+                          [fox_utils:params_network_to_str(Params)]),
+    case Connection of
+        undefined -> do_nothing;
+        Pid ->
+            %% TODO demonitor
+            try
+                amqp_connection:close(Pid)
+            catch
+                %% connection may be already closed on server
+                exit:{noproc, _} -> ok
+            end
+    end,
+    {stop, normal, ok, State#state{connection = undefined}};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
@@ -65,7 +82,7 @@ handle_info(connect, #state{params_network = Params, reconnect_attempt = Attempt
             Timeout = herd_reconnect:exp_backoff(Attempt, MinTimeout, MaxTimeout),
             error_logger:warning_msg("fox_connection_worker reconnect after ~p attempt ~p", [Timeout, Attempt]),
             erlang:send_after(Timeout, self(), connect),
-            {noreply, State#state{reconnect_attempt = Attempt + 1}}
+            {noreply, State#state{connection = undefined, reconnect_attempt = Attempt + 1}}
     end;
 
 handle_info(Request, State) ->
@@ -81,7 +98,3 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), term(), term()) -> gs_code_change_reply().
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
-
-
-
-%%% inner functions

@@ -6,13 +6,15 @@
     для каждого {ConnectionName, #amqp_network_params{}} нужно создать connection_sup
     и под ним несколько connection_worker
   + connect
-  - reconnect
-  - close connection
+  + reconnect
+  + close connection
+  - monitor connection
 
 ** АПИ 1-го уровня:
-  - create_connection_pool(ConnectionName, #amqp_network_params{} | map(), NumConnections) -> ok
+  + validate_network_params(#amqp_network_params{}) -> boolean()
+  + create_connection_pool(ConnectionName, #amqp_network_params{} | map()) -> ok
   - close_connection_pool(ConnectionName)
-  - validate_network_params(#amqp_network_params{}) -> boolean()
+
 
 * 2й уровень -- channel
   - channel_sup (simple_one_for_one), run channel_worker
