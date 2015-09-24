@@ -56,9 +56,11 @@ test_run() ->
     {error, {auth_failure, _}} = validate_params_network(Params#{username => <<"Bob">>}),
 
     create_connection_pool("test_pool", Params),
-    create_connection_pool("pool_2", Params#{virtual_host => <<"/test">>}),
 
-    timer:sleep(1000),
-    ok = close_connection_pool("pool_2"),
+    %% create_connection_pool("pool_2", Params#{virtual_host => <<"/test">>}),
+    %% timer:sleep(1000),
+    %% ok = close_connection_pool("pool_2"),
+
+    fox_channel_sup:start_channel(self(), 42),
 
     ok.

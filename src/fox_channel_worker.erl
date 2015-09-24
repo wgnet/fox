@@ -1,7 +1,7 @@
 -module(fox_channel_worker).
 -behavior(gen_server).
 
--export([start_link/1]).
+-export([start_link/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -9,16 +9,16 @@
 
 %%% module API
 
--spec start_link(term()) -> gs_start_link_reply().
-start_link(Params) ->
-    gen_server:start_link(?MODULE, Params, []).
+-spec start_link(pid(), integer()) -> gs_start_link_reply().
+start_link(Connection, ChannelNumber) ->
+    gen_server:start_link(?MODULE, {Connection, ChannelNumber}, []).
 
 
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(Params) ->
-    ?info("fox_channel_worker:init with params:~p", [Params]),
+init({Connection, ChannelNumber}) ->
+    ?info("fox_channel_worker:init, connection:~p channel_number:~p", [Connection, ChannelNumber]),
     {ok, no_state}.
 
 

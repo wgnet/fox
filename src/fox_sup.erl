@@ -16,12 +16,13 @@ init(_Args) ->
     ConnectionPoolSup =
         {fox_connection_pool_sup,
          {fox_connection_pool_sup, start_link, []},
-         permanent,
-         2000,
-         supervisor,
+         permanent, 2000, supervisor,
          [fox_connection_pool_sup]},
 
-    %% TODO
-    %% ChannelSup =
+    ChannelSup =
+        {fox_channel_sup,
+         {fox_channel_sup, start_link, []},
+         permanent, 2000, supervisor,
+         [fox_channel_sup]},
 
-    {ok, {{one_for_one, 10, 60}, [ConnectionPoolSup]}}.
+    {ok, {{one_for_one, 10, 60}, [ConnectionPoolSup, ChannelSup]}}.
