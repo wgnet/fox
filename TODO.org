@@ -1,0 +1,73 @@
+* 1й уровень -- connection
+  - app, sup
+    - connection_pool_sup
+      - connection_sup (register with ConnectionName, run Num connection_worker)
+    - channel_sup (simple_one_for_one), run channel_worker
+  - динамическое создание новых соединений и остановка их
+    для каждого {ConnectionName, #amqp_network_params{}} нужно создать connection_sup
+    и под ним несколько connection_worker
+  - каждый connection_worker обеспечивает reconnect для своего connection
+  - выбор соединений
+    - по ConnectionName выбрать нужный connection_sup
+    - для этого sup обойти все его connection_worker
+      и выбрать тот, у кого меньше всего channel
+      which_children(SupRef) -> [{Id, Child, Type, Modules}]
+      Child - the pid of the corresponding child process, the atom restarting if the process is about to be restarted, or undefined if there is no such process.
+
+** АПИ 1-го уровня:
+  - validate_network_params(#amqp_network_params{}) -> boolean()
+  - create_connection_pool(ConnectionName, #amqp_network_params{} | map(), NumConnections) -> ok
+  - close_connection_pool(ConnectionName)
+
+* 2й уровень -- channel
+  - supervisor simple-one-for-one для запуска channel_worker
+  - создание channel и channel_worker по требованию
+    The consumer module for a channel is chosen when the channel is opened by
+    setting the second parameter to amqp_connection:open_channel/2. The
+    consumer module implements the amqp_gen_consumer behaviour and thus
+    implements functions to handle receiving basic.consume,
+    basic.consume_ok, basic.cancel, basic.cancel_ok methods as well as publishes.
+  - хранить их внутри connection_worker
+  - завершение channel_worker
+
+** АПИ 2-го уровня:
+  - create_channel(ConnectionName) -> ChannelPid
+  - close_channel(ConnectionName, ChannelPid) -> ok
+
+* 3й уровень -- сценарии использования channel
+  channel_worker хранит внутри себя channel (свой собственный, экслюзивный)
+  и предоставляет АПИ для основных сценариев:
+  - publish (async)
+  - publish with confirmation (не документарован, нужно разбираться)
+  - declare exchange, declare queue, bind queue
+  - subscribe
+    behaviour amqp_subscriber (придумать название)
+    - init(ChannelPid) -> State. Тут делать все declare и bind
+    - handle_message(Message, ChannelPid, State)
+    sample_subscriber модуль, включить в либу, использовать в тестах
+  - unsubscribe
+  сделаю везде мапы как альтернативу рекордам
+
+** АПИ 3-го уровня нужно продумать:
+  - publish(ChannelPid, Data) ?
+  - publish_with_confirmation?
+    https://www.rabbitmq.com/confirms.html
+  - subscribe(ChannelPid, callback, #amqp_consumer{}) ?
+    behaviour amqp_consumer
+    process_data(ChannelPid, Data) -> ack | reject
+    unsubscribe() ?
+  - declare exchange, queue, bind
+
+* Мониторинг:
+  - connection_worker должен мониторить channel и channel_worker
+    перезапускать их, если они упали, заново объявлять и связывать, если нужно
+  - connection_worker после reconnect должен создать новые channel и раздать их channel_worker
+    ну и те должны заново инициализироваться
+
+* README
+
+* samples
+
+* info
+http://www.rabbitmq.com/erlang-client-user-guide.html
+https://www.rabbitmq.com/confirms.html
