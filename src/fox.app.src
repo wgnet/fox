@@ -1,0 +1,10 @@
+%% -*- mode: Erlang;-*-
+{application, fox,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [kernel, stdlib]},
+  {mod, {fox_app, []}},
+  {env, []}
+ ]}.
