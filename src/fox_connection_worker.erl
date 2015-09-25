@@ -1,7 +1,7 @@
 -module(fox_connection_worker).
 -behavior(gen_server).
 
--export([start_link/1, get_num_channels/1, create_channel/1, stop/1]).
+-export([start_link/1, get_num_channels/1, create_channel/1, create_channel/3, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -38,6 +38,11 @@ create_channel(Pid) ->
     gen_server:call(Pid, create_channel).
 
 
+-spec create_channel(pid(), module(), list()) -> {ok, pid()} | {error, term()}.
+create_channel(Pid, ConsumerModule, ConsumerModuleArgs) ->
+    gen_server:call(Pid, {create_channel, ConsumerModule, ConsumerModuleArgs}).
+
+
 -spec stop(pid()) -> ok.
 stop(Pid) ->
     gen_server:call(Pid, stop).
@@ -60,6 +65,13 @@ handle_call(create_channel, _From, #state{connection = Connection} = State) ->
     Reply = case Connection of
                 undefined -> {error, no_connection};
                 Pid -> amqp_connection:open_channel(Pid)
+            end,
+    {reply, Reply, State};
+
+handle_call({create_channel, ConsumerModule, ConsumerModuleArgs}, _From, #state{connection = Connection} = State) ->
+    Reply = case Connection of
+                undefined -> {error, no_connection};
+                Pid -> amqp_connection:open_channel(Pid, none, {ConsumerModule, ConsumerModuleArgs})
             end,
     {reply, Reply, State};
 

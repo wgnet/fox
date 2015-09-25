@@ -3,7 +3,7 @@
 -export([validate_params_network/1,
          create_connection_pool/2,
          close_connection_pool/1,
-         create_channel/1,
+         create_channel/1, create_channel/3,
          test_run/0]).
 
 -include("fox.hrl").
@@ -48,6 +48,13 @@ create_channel(ConnectionName) ->
     fox_connection_pool_sup:create_channel(ConnectionName2).
 
 
+-spec create_channel(connection_name(), module(), list()) -> {ok, pid()} | {error, term()}.
+create_channel(ConnectionName, ConsumerModule, ConsumerModuleArgs) ->
+    true = fox_utils:validate_consumer_behaviour(ConsumerModule),
+    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
+    fox_connection_pool_sup:create_channel(ConnectionName2, ConsumerModule, ConsumerModuleArgs).
+
+
 -spec(test_run() -> ok).
 test_run() ->
     application:ensure_all_started(fox),
@@ -67,6 +74,8 @@ test_run() ->
     %% timer:sleep(1000),
     %% ok = close_connection_pool("pool_2"),
 
-    Channel = create_channel("test_pool"),
-    ?d("Channel: ~p", [Channel]),
+    Channel1 = create_channel("test_pool", fox_sample_consumer, ["sc 1", 1]),
+    ?d("Channel1: ~p", [Channel1]),
+    Channel2 = create_channel("test_pool", fox_sample_consumer, ["sc 2", 2]),
+    ?d("Channel2: ~p", [Channel2]),
     ok.

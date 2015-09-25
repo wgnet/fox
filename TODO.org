@@ -16,19 +16,20 @@
     + по ConnectionName выбрать нужный connection_sup
     + для этого sup обойти все его connection_worker
       и выбрать тот, у кого меньше всего channel
-    - connection_worker вызывает
-      fox_channel_sup:start_channel(self(), 42),
-      - какие аргументы передать?
-        amqp_connection:open_channel(ConnectionPid, ChannelNumber, {_ConsumerModule, _ConsumerArgs} = Consumer) ->
-        - что такое ChannelNumber?
-        - разобраться с Consumer
-          The consumer module for a channel is chosen when the channel is opened by
-          setting the second parameter to amqp_connection:open_channel/2. The
-          consumer module implements the amqp_gen_consumer behaviour and thus
-          implements functions to handle receiving basic.consume,
-          basic.consume_ok, basic.cancel, basic.cancel_ok methods as well as publishes.
-  - хранить их внутри connection_worker
-  - завершение channel_worker
+  - sample_consumer implements amqp_gen_consumer
+    + передавать на open_channel
+      amqp_connection:open_channel(ConnectionPid, ChannelNumber, {_ConsumerModule, _ConsumerArgs} = Consumer) ->
+    - check module implements behaviour
+    - create sample_consumer module
+    - что такое consumer_tag?
+    - в test_run наладить публикацию и подписку,
+      чтобы получать события в sample_consumer
+    - нужно ли мне как-то хранить пару {ChannelPid, SampleConsumerPid}?
+  - fox_channel_sup кажись не нужен
+  - наверное, еще нужна упрощенная альтернатива для sample_consumer
+    чтобы не реализовывать весь behaviour полностью, а только часть его
+  - amqp_channel:subscribe тож надо бы вынести и АПИ
+
 
 ** АПИ 2-го уровня:
   - create_channel(ConnectionName) -> ChannelPid
@@ -68,6 +69,8 @@
 документация на весь АПИ
 - fox:create_channel/1 -- за канал отвечает потребитель, либа дальше этот канал не использует и не мониторит
 как работает либа (структура потоков и т.д.)
+- amqp_channel:subscribe мы в АПИ не выставляем, но пользователь может сделать это сам,
+  получив канал через create_channel
 
 * samples
 

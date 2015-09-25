@@ -3,7 +3,9 @@
 -export([name_to_atom/1,
          map_to_params_network/1,
          params_network_to_str/1,
-         validate_params_network_types/1]).
+         validate_params_network_types/1,
+         validate_consumer_behaviour/1
+        ]).
 
 -include("fox.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
@@ -48,7 +50,7 @@ params_network_to_str(#amqp_params_network{host = Host,
     io_lib:format("~s@~s:~p~s", [Username, Host, Port, VHost]).
 
 
--spec validate_params_network_types(#amqp_params_network{}) -> true.
+-spec validate_params_network_types(#amqp_params_network{}) -> true | no_return().
 validate_params_network_types(
   #amqp_params_network{
      host = Host,
@@ -81,4 +83,20 @@ validate_params_network_types(
         not is_list(ClientProperties) -> throw({invalid_amqp_params_network, "client_properties should be list"});
         not is_list(SocketOptions) -> throw({invalid_amqp_params_network, "socket_options should be list"});
         true -> true
+    end.
+
+
+-spec validate_consumer_behaviour(module()) -> true | no_return().
+validate_consumer_behaviour(Module) ->
+    case code:is_loaded(Module) of
+        {file, _} -> do_nothing;
+        false -> code:load_file(Module)
+    end,
+    Callbacks = amqp_gen_consumer:behaviour_info(callbacks),
+    NotExported = lists:filter(fun({Fun, Arity}) ->
+                                       not erlang:function_exported(Module, Fun, Arity)
+                               end, Callbacks),
+    case NotExported of
+        [] -> true;
+        _ -> throw({invalid_consumer_module, {should_be_exported, NotExported}})
     end.

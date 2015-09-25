@@ -1,12 +1,14 @@
 -module(fox_connection_sup).
 -behaviour(supervisor).
 
--export([start_link/3, init/1, create_channel/1, stop/1]).
+-export([start_link/3, init/1, create_channel/1, create_channel/3, stop/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
 
+
+%% Module API
 
 -spec(start_link(atom(), #amqp_params_network{}, integer()) -> {ok, pid()}).
 start_link(PoolName, Params, PoolSize) ->
@@ -27,20 +29,17 @@ init({Params, PoolSize}) ->
 
 -spec create_channel(pid()) -> {ok, pid()} | {error, term()}.
 create_channel(SupPid) ->
-    Res = lists:sort(
-            lists:filtermap(
-              fun({_, ChildPid, _, _}) ->
-                      case fox_connection_worker:get_num_channels(ChildPid) of
-                          {ok, Num} -> {true, {Num, ChildPid}};
-                          {error, no_connection} -> false
-                      end
-              end,
-              supervisor:which_children(SupPid))),
-    ?d("Res:~p", [Res]),
-    case Res of
-        [{_, Worker} | _] ->
-            fox_connection_worker:create_channel(Worker);
-        [] -> {error, no_connection}
+    case get_less_busy_worker(SupPid) of
+        {ok, Worker} -> fox_connection_worker:create_channel(Worker);
+        {error, Reason} -> {error, Reason}
+    end.
+
+
+-spec create_channel(pid(), module(), list()) -> {ok, pid()} | {error, term()}.
+create_channel(SupPid, ConsumerModule, ConsumerModuleArgs) ->
+    case get_less_busy_worker(SupPid) of
+        {ok, Worker} -> fox_connection_worker:create_channel(Worker, ConsumerModule, ConsumerModuleArgs);
+        {error, Reason} -> {error, Reason}
     end.
 
 
@@ -51,3 +50,22 @@ stop(SupPid) ->
                   end,
                   supervisor:which_children(SupPid)),
     ok.
+
+
+%% Inner functions
+
+-spec get_less_busy_worker(pid()) -> {ok, pid()} | {error, no_connection}.
+get_less_busy_worker(SupPid) ->
+    Res = lists:sort(
+            lists:filtermap(
+              fun({_, ChildPid, _, _}) ->
+                      case fox_connection_worker:get_num_channels(ChildPid) of
+                          {ok, Num} -> {true, {Num, ChildPid}};
+                          {error, no_connection} -> false
+                      end
+              end,
+              supervisor:which_children(SupPid))),
+    case Res of
+        [{_, Worker} | _] -> {ok, Worker};
+        [] -> {error, no_connection}
+    end.
