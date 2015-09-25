@@ -3,6 +3,7 @@
 -export([validate_params_network/1,
          create_connection_pool/2,
          close_connection_pool/1,
+         create_channel/1,
          test_run/0]).
 
 -include("fox.hrl").
@@ -41,10 +42,15 @@ close_connection_pool(ConnectionName) ->
     fox_connection_pool_sup:stop_pool(ConnectionName2).
 
 
+-spec create_channel(connection_name()) -> {ok, pid()} | {error, term()}.
+create_channel(ConnectionName) ->
+    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
+    fox_connection_pool_sup:create_channel(ConnectionName2).
+
+
 -spec(test_run() -> ok).
 test_run() ->
     application:ensure_all_started(fox),
-    application:set_env(fox, connection_pool_size, 2),
 
     Params = #{host => "localhost",
                 port => 5672,
@@ -61,6 +67,6 @@ test_run() ->
     %% timer:sleep(1000),
     %% ok = close_connection_pool("pool_2"),
 
-    fox_channel_sup:start_channel(self(), 42),
-
+    Channel = create_channel("test_pool"),
+    ?d("Channel: ~p", [Channel]),
     ok.

@@ -1,7 +1,7 @@
 -module(fox_connection_pool_sup).
 -behaviour(supervisor).
 
--export([start_link/0, init/1, start_pool/3, stop_pool/1]).
+-export([start_link/0, init/1, start_pool/3, create_channel/1, stop_pool/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -13,6 +13,11 @@
 -spec(start_link() -> {ok, pid()}).
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+
+-spec(init(gs_args()) -> sup_init_reply()).
+init(_Args) ->
+    {ok, {{one_for_one, 10, 60}, []}}.
 
 
 -spec start_pool(atom(), #amqp_params_network{}, integer()) -> ok.
@@ -27,10 +32,14 @@ start_pool(PoolName, Params, PoolSize) ->
     ok.
 
 
--spec(init(gs_args()) -> sup_init_reply()).
-init(_Args) ->
-    {ok, {{one_for_one, 10, 60}, []}}.
-
+-spec create_channel(atom()) -> {ok, pid()} | {error, term()}.
+create_channel(PoolName) ->
+    ChildId = {fox_connection_sup, PoolName},
+    case find_child(ChildId) of
+        {ok, {ChildId, ChildPid, _, _}} ->
+            fox_connection_sup:create_channel(ChildPid);
+        {error, not_found} -> {error, not_found}
+    end.
 
 
 -spec stop_pool(atom()) -> ok | {error, term()}.

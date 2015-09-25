@@ -1,7 +1,7 @@
 -module(fox_connection_worker).
 -behavior(gen_server).
 
--export([start_link/1, stop/1]).
+-export([start_link/1, get_num_channels/1, create_channel/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -13,7 +13,6 @@
           connection :: pid(),
           connection_ref :: reference(),
           params_network :: #amqp_params_network{},
-          num_channels = 0 :: non_neg_integer(),
           reconnect_attempt = 0 :: non_neg_integer()
          }).
 
@@ -23,6 +22,20 @@
 -spec start_link(term()) -> gs_start_link_reply().
 start_link(Params) ->
     gen_server:start_link(?MODULE, Params, []).
+
+
+-spec get_num_channels(pid()) -> {ok, integer()} | {error, no_connection}.
+get_num_channels(Pid) ->
+    case gen_server:call(Pid, get_connection) of
+        undefined -> {error, no_connection};
+        Connection -> [{num_channels, Num}] = amqp_connection:info(Connection, [num_channels]),
+                      {ok, Num}
+    end.
+
+
+-spec create_channel(pid()) -> {ok, pid()} | {error, term()}.
+create_channel(Pid) ->
+    gen_server:call(Pid, create_channel).
 
 
 -spec stop(pid()) -> ok.
@@ -40,6 +53,16 @@ init(Params) ->
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
+handle_call(get_connection, _From, #state{connection = Connection} = State) ->
+    {reply, Connection, State};
+
+handle_call(create_channel, _From, #state{connection = Connection} = State) ->
+    Reply = case Connection of
+                undefined -> {error, no_connection};
+                Pid -> amqp_connection:open_channel(Pid)
+            end,
+    {reply, Reply, State};
+
 handle_call(stop, _From, #state{connection = Connection, connection_ref = Ref,
                                 params_network = Params} = State) ->
     error_logger:info_msg("fox_connection_worker close connection ~s",

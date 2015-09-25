@@ -18,7 +18,7 @@ start_link(Connection, ChannelNumber) ->
 
 -spec init(gs_args()) -> gs_init_reply().
 init({Connection, ChannelNumber}) ->
-    ?info("fox_channel_worker:init, connection:~p channel_number:~p", [Connection, ChannelNumber]),
+    ?d("fox_channel_worker:init, connection:~p channel_number:~p", [Connection, ChannelNumber]),
     {ok, no_state}.
 
 

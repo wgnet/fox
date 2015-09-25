@@ -1,7 +1,7 @@
 -module(fox_connection_sup).
 -behaviour(supervisor).
 
--export([start_link/3, init/1, stop/1]).
+-export([start_link/3, init/1, create_channel/1, stop/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -23,6 +23,25 @@ init({Params, PoolSize}) ->
            end,
     Childs = [Spec(Id) || Id <- lists:seq(1, PoolSize)],
     {ok, {{one_for_one, 10, 60}, Childs}}.
+
+
+-spec create_channel(pid()) -> {ok, pid()} | {error, term()}.
+create_channel(SupPid) ->
+    Res = lists:sort(
+            lists:filtermap(
+              fun({_, ChildPid, _, _}) ->
+                      case fox_connection_worker:get_num_channels(ChildPid) of
+                          {ok, Num} -> {true, {Num, ChildPid}};
+                          {error, no_connection} -> false
+                      end
+              end,
+              supervisor:which_children(SupPid))),
+    ?d("Res:~p", [Res]),
+    case Res of
+        [{_, Worker} | _] ->
+            fox_connection_worker:create_channel(Worker);
+        [] -> {error, no_connection}
+    end.
 
 
 -spec stop(pid()) -> ok.

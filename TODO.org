@@ -11,14 +11,13 @@
   + monitor connection
 
 * 2й уровень -- channel
-  - channel_sup (simple_one_for_one), run channel_worker
+  + channel_sup (simple_one_for_one), run channel_worker
   - создание channel и channel_worker по требованию
-    - по ConnectionName выбрать нужный connection_sup
-    - для этого sup обойти все его connection_worker
+    + по ConnectionName выбрать нужный connection_sup
+    + для этого sup обойти все его connection_worker
       и выбрать тот, у кого меньше всего channel
-      which_children(SupRef) -> [{Id, Child, Type, Modules}]
-      Child - the pid of the corresponding child process, the atom restarting if the process is about to be restarted, or undefined if there is no such process.
-    - connection_worker вызывает fox_channel_sup:start_child(...)
+    - connection_worker вызывает
+      fox_channel_sup:start_channel(self(), 42),
       - какие аргументы передать?
         amqp_connection:open_channel(ConnectionPid, ChannelNumber, {_ConsumerModule, _ConsumerArgs} = Consumer) ->
         - что такое ChannelNumber?
@@ -66,6 +65,9 @@
     ну и те должны заново инициализироваться
 
 * README
+документация на весь АПИ
+- fox:create_channel/1 -- за канал отвечает потребитель, либа дальше этот канал не использует и не мониторит
+как работает либа (структура потоков и т.д.)
 
 * samples
 
