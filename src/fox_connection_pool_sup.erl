@@ -1,7 +1,7 @@
 -module(fox_connection_pool_sup).
 -behaviour(supervisor).
 
--export([start_link/0, init/1, start_pool/3, create_channel/1, create_channel/3, stop_pool/1]).
+-export([start_link/0, init/1, start_pool/3, create_channel/1, subscribe/3, stop_pool/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -42,12 +42,12 @@ create_channel(PoolName) ->
     end.
 
 
--spec create_channel(atom(), module(), list()) -> {ok, pid()} | {error, term()}.
-create_channel(PoolName, ConsumerModule, ConsumerModuleArgs) ->
+-spec subscribe(atom(), module(), list()) -> {ok, pid()} | {error, term()}.
+subscribe(PoolName, ConsumerModule, ConsumerModuleArgs) ->
     ChildId = {fox_connection_sup, PoolName},
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} ->
-            fox_connection_sup:create_channel(ChildPid, ConsumerModule, ConsumerModuleArgs);
+            fox_connection_sup:subscribe(ChildPid, ConsumerModule, ConsumerModuleArgs);
         {error, not_found} -> {error, not_found}
     end.
 

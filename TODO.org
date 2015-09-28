@@ -10,30 +10,35 @@
   + close connection
   + monitor connection
 
+
 * 2й уровень -- channel
-  + channel_sup (simple_one_for_one), run channel_worker
-  - создание channel и channel_worker по требованию
+  + create channel
     + по ConnectionName выбрать нужный connection_sup
     + для этого sup обойти все его connection_worker
       и выбрать тот, у кого меньше всего channel
-  - sample_consumer implements amqp_gen_consumer
-    + передавать на open_channel
-      amqp_connection:open_channel(ConnectionPid, ChannelNumber, {_ConsumerModule, _ConsumerArgs} = Consumer) ->
-    - check module implements behaviour
-    - create sample_consumer module
-    - что такое consumer_tag?
-    - в test_run наладить публикацию и подписку,
-      чтобы получать события в sample_consumer
-    - нужно ли мне как-то хранить пару {ChannelPid, SampleConsumerPid}?
-  - fox_channel_sup кажись не нужен
-  - наверное, еще нужна упрощенная альтернатива для sample_consumer
-    чтобы не реализовывать весь behaviour полностью, а только часть его
-  - amqp_channel:subscribe тож надо бы вынести и АПИ
 
+  + subscribe
+    + channel_sup (simple_one_for_one), run fox_channel_consumer
+    + fox_channel_consumer и  behaviour
+    + behaviour будет простой: init и handle
+      handle будет получать все возможные события.
+    + validate behaviour
+    + sample_consumer:init -- declare exchange/queue, bind
+    + channel_worker
+      и редиректить события в behaviour (sample_consumer)
+      передавая туда еще и ChannelPid
 
-** АПИ 2-го уровня:
-  - create_channel(ConnectionName) -> ChannelPid
+  + в test_run наладить публикацию и подписку,
+    чтобы получать события в sample_consumer
+    + создать канал для sample_consumer
+    + в init создать exchange, queue, bind
+    + послать сообщение через другой канал
+    + получить в sample_consumer
+
   - close_channel(ConnectionName, ChannelPid) -> ok
+
+  - unsubscribe
+    ну и там должен быть вызов sample_channel_consumer:terminate
 
 * 3й уровень -- сценарии использования channel
   channel_worker хранит внутри себя channel (свой собственный, экслюзивный)
@@ -42,10 +47,7 @@
   - publish with confirmation (не документарован, нужно разбираться)
   - declare exchange, declare queue, bind queue
   - subscribe
-    behaviour amqp_subscriber (придумать название)
-    - init(ChannelPid) -> State. Тут делать все declare и bind
-    - handle_message(Message, ChannelPid, State)
-    sample_subscriber модуль, включить в либу, использовать в тестах
+    - что если мы хотим пописаться на 2 очереди?
   - unsubscribe
   сделаю везде мапы как альтернативу рекордам
 
@@ -64,6 +66,7 @@
     перезапускать их, если они упали, заново объявлять и связывать, если нужно
   - connection_worker после reconnect должен создать новые channel и раздать их channel_worker
     ну и те должны заново инициализироваться
+
 
 * README
 документация на весь АПИ

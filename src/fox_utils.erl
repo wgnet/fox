@@ -92,7 +92,7 @@ validate_consumer_behaviour(Module) ->
         {file, _} -> do_nothing;
         false -> code:load_file(Module)
     end,
-    Callbacks = amqp_gen_consumer:behaviour_info(callbacks),
+    Callbacks = fox_channel_consumer:behaviour_info(callbacks),
     NotExported = lists:filter(fun({Fun, Arity}) ->
                                        not erlang:function_exported(Module, Fun, Arity)
                                end, Callbacks),

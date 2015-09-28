@@ -3,7 +3,8 @@
 -export([validate_params_network/1,
          create_connection_pool/2,
          close_connection_pool/1,
-         create_channel/1, create_channel/3,
+         create_channel/1,
+         subscribe/2, subscribe/3,
          test_run/0]).
 
 -include("fox.hrl").
@@ -48,11 +49,16 @@ create_channel(ConnectionName) ->
     fox_connection_pool_sup:create_channel(ConnectionName2).
 
 
--spec create_channel(connection_name(), module(), list()) -> {ok, pid()} | {error, term()}.
-create_channel(ConnectionName, ConsumerModule, ConsumerModuleArgs) ->
+-spec subscribe(connection_name(), module()) -> {ok, pid()} | {error, term()}.
+subscribe(ConnectionName, ConsumerModule) ->
+    subscribe(ConnectionName, ConsumerModule, []).
+
+
+-spec subscribe(connection_name(), module(), list()) -> {ok, pid()} | {error, term()}.
+subscribe(ConnectionName, ConsumerModule, ConsumerModuleArgs) ->
     true = fox_utils:validate_consumer_behaviour(ConsumerModule),
     ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
-    fox_connection_pool_sup:create_channel(ConnectionName2, ConsumerModule, ConsumerModuleArgs).
+    fox_connection_pool_sup:subscribe(ConnectionName2, ConsumerModule, ConsumerModuleArgs).
 
 
 -spec(test_run() -> ok).
@@ -60,22 +66,20 @@ test_run() ->
     application:ensure_all_started(fox),
 
     Params = #{host => "localhost",
-                port => 5672,
-                virtual_host => <<"/">>,
-                username => <<"guest">>,
-                password => <<"guest">>},
+               port => 5672,
+               virtual_host => <<"/">>,
+               username => <<"guest">>,
+               password => <<"guest">>},
 
     ok = validate_params_network(Params),
     {error, {auth_failure, _}} = validate_params_network(Params#{username => <<"Bob">>}),
 
     create_connection_pool("test_pool", Params),
+    {ok, _} = subscribe("test_pool", sample_channel_consumer),
+    {ok, Channel} = create_channel("test_pool"),
 
-    %% create_connection_pool("pool_2", Params#{virtual_host => <<"/test">>}),
-    %% timer:sleep(1000),
-    %% ok = close_connection_pool("pool_2"),
+    Publish = #'basic.publish'{exchange = <<"my_exchange">>, routing_key = <<"my_key">>},
+    Message = #amqp_msg{payload = <<"Hello there!">>},
+    amqp_channel:cast(Channel, Publish, Message),
 
-    Channel1 = create_channel("test_pool", fox_sample_consumer, ["sc 1", 1]),
-    ?d("Channel1: ~p", [Channel1]),
-    Channel2 = create_channel("test_pool", fox_sample_consumer, ["sc 2", 2]),
-    ?d("Channel2: ~p", [Channel2]),
     ok.
