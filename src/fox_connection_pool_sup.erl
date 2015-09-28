@@ -1,7 +1,12 @@
 -module(fox_connection_pool_sup).
 -behaviour(supervisor).
 
--export([start_link/0, init/1, start_pool/3, create_channel/1, subscribe/3, stop_pool/1]).
+-export([start_link/0,
+         init/1,
+         start_pool/3, stop_pool/1,
+         create_channel/1,
+         subscribe/3, unsubscribe/2
+        ]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -32,6 +37,19 @@ start_pool(PoolName, Params, PoolSize) ->
     ok.
 
 
+-spec stop_pool(atom()) -> ok | {error, term()}.
+stop_pool(PoolName) ->
+    error_logger:info_msg("fox stop pool ~p", [PoolName]),
+    ChildId = {fox_connection_sup, PoolName},
+    case find_child(ChildId) of
+        {ok, {ChildId, ChildPid, _, _}} ->
+            fox_connection_sup:stop(ChildPid),
+            ok = supervisor:terminate_child(?MODULE, ChildId),
+            supervisor:delete_child(?MODULE, ChildId);
+        {error, not_found} -> {error, not_found}
+    end.
+
+
 -spec create_channel(atom()) -> {ok, pid()} | {error, term()}.
 create_channel(PoolName) ->
     ChildId = {fox_connection_sup, PoolName},
@@ -52,15 +70,12 @@ subscribe(PoolName, ConsumerModule, ConsumerModuleArgs) ->
     end.
 
 
--spec stop_pool(atom()) -> ok | {error, term()}.
-stop_pool(PoolName) ->
-    error_logger:info_msg("fox stop pool ~p", [PoolName]),
+-spec unsubscribe(atom(), pid()) -> ok | {error, term()}.
+unsubscribe(PoolName, ChannelPid) ->
     ChildId = {fox_connection_sup, PoolName},
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} ->
-            fox_connection_sup:stop(ChildPid),
-            ok = supervisor:terminate_child(?MODULE, ChildId),
-            supervisor:delete_child(?MODULE, ChildId);
+            fox_connection_sup:unsubscribe(ChildPid, ChannelPid);
         {error, not_found} -> {error, not_found}
     end.
 

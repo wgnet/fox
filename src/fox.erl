@@ -4,7 +4,7 @@
          create_connection_pool/2,
          close_connection_pool/1,
          create_channel/1,
-         subscribe/2, subscribe/3,
+         subscribe/2, subscribe/3, unsubscribe/2,
          test_run/0]).
 
 -include("fox.hrl").
@@ -61,6 +61,12 @@ subscribe(ConnectionName, ConsumerModule, ConsumerModuleArgs) ->
     fox_connection_pool_sup:subscribe(ConnectionName2, ConsumerModule, ConsumerModuleArgs).
 
 
+-spec unsubscribe(connection_name(), pid()) -> ok | {error, term()}.
+unsubscribe(ConnectionName, ChannelPid) ->
+    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
+    fox_connection_pool_sup:unsubscribe(ConnectionName2, ChannelPid).
+
+
 -spec(test_run() -> ok).
 test_run() ->
     application:ensure_all_started(fox),
@@ -75,11 +81,16 @@ test_run() ->
     {error, {auth_failure, _}} = validate_params_network(Params#{username => <<"Bob">>}),
 
     create_connection_pool("test_pool", Params),
-    {ok, _} = subscribe("test_pool", sample_channel_consumer),
-    {ok, Channel} = create_channel("test_pool"),
+    {ok, SChannel} = subscribe("test_pool", sample_channel_consumer),
+    {ok, PChannel} = create_channel("test_pool"),
 
     Publish = #'basic.publish'{exchange = <<"my_exchange">>, routing_key = <<"my_key">>},
     Message = #amqp_msg{payload = <<"Hello there!">>},
-    amqp_channel:cast(Channel, Publish, Message),
+    amqp_channel:cast(PChannel, Publish, Message),
+
+    Res = unsubscribe("test_pool", SChannel),
+    ?d("unsubscribe ~p", [Res]),
+
+    amqp_channel:close(PChannel),
 
     ok.

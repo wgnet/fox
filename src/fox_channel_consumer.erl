@@ -1,7 +1,7 @@
 -module(fox_channel_consumer).
 -behavior(gen_server).
 
--export([start_link/3, behaviour_info/1]).
+-export([start_link/3, stop/1, behaviour_info/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -20,6 +20,11 @@
 -spec start_link(pid(), module(), list()) -> gs_start_link_reply().
 start_link(ChannelPid, ConsumerModule, ConsumerModuleArgs) ->
     gen_server:start_link(?MODULE, {ChannelPid, ConsumerModule, ConsumerModuleArgs}, []).
+
+
+-spec stop(pid()) -> ok.
+stop(Pid) ->
+    gen_server:call(Pid, stop).
 
 
 -spec behaviour_info(term()) -> term().
@@ -48,9 +53,11 @@ init({ChannelPid, ConsumerModule, ConsumerModuleArgs}) ->
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call({some, _Data}, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State};
+handle_call(stop, _From, #state{channel_pid = ChannelPid,
+                                consumer = ConsumerModule,
+                                consumer_state = CState} = State) ->
+    ConsumerModule:terminate(ChannelPid, CState),
+    {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),

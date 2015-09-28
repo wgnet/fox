@@ -11,7 +11,7 @@
   + monitor connection
 
 
-* 2й уровень -- channel
+* DONE 2й уровень -- channel
   + create channel
     + по ConnectionName выбрать нужный connection_sup
     + для этого sup обойти все его connection_worker
@@ -35,47 +35,52 @@
     + послать сообщение через другой канал
     + получить в sample_consumer
 
-  - close_channel(ConnectionName, ChannelPid) -> ok
+  + unsubscribe
+    + по ChannelPid найти нужный connection_worker
+      можно тупо дернуть всех, а сработает тот, кому принадлежит ChannelPid
+    + connection_worker должен хранить в своем состоянии все {ChannelPid, SubscriberPid}
+    + вызывать fox_channel_consumer:stop
+    + вызывать sample_channel_consumer:terminate
 
-  - unsubscribe
-    ну и там должен быть вызов sample_channel_consumer:terminate
 
 * 3й уровень -- сценарии использования channel
-  channel_worker хранит внутри себя channel (свой собственный, экслюзивный)
-  и предоставляет АПИ для основных сценариев:
-  - publish (async)
-  - publish with confirmation (не документарован, нужно разбираться)
-  - declare exchange, declare queue, bind queue
-  - subscribe
-    - что если мы хотим пописаться на 2 очереди?
-  - unsubscribe
-  сделаю везде мапы как альтернативу рекордам
+АПИ для основных сценариев
+сделаю везде мапы как альтернативу рекордам
 
-** АПИ 3-го уровня нужно продумать:
-  - publish(ChannelPid, Data) ?
-  - publish_with_confirmation?
-    https://www.rabbitmq.com/confirms.html
-  - subscribe(ChannelPid, callback, #amqp_consumer{}) ?
-    behaviour amqp_consumer
-    process_data(ChannelPid, Data) -> ack | reject
-    unsubscribe() ?
-  - declare exchange, queue, bind
+- declare exchange, declare queue, bind queue
+
+- publish (async)
+
+- publish with confirmation (не документарован, нужно разбираться)
+  https://www.rabbitmq.com/confirms.html
+
+- subscribe
+  - что если мы хотим пописаться на 2 очереди?
+
++ unsubscribe
+
 
 * Мониторинг:
-  - connection_worker должен мониторить channel и channel_worker
-    перезапускать их, если они упали, заново объявлять и связывать, если нужно
-  - connection_worker после reconnect должен создать новые channel и раздать их channel_worker
-    ну и те должны заново инициализироваться
+
+- fox_connection_worker должен мониторить channel и fox_channel_consumer
+  перезапускать их, если они упали, заново объявлять и связывать, если нужно
+
+- connection_worker после reconnect должен создать новые channel и раздать их channel_worker
+  ну и те должны заново инициализироваться
+
+- как все это протестить?
 
 
 * README
-документация на весь АПИ
-- fox:create_channel/1 -- за канал отвечает потребитель, либа дальше этот канал не использует и не мониторит
-как работает либа (структура потоков и т.д.)
-- amqp_channel:subscribe мы в АПИ не выставляем, но пользователь может сделать это сам,
-  получив канал через create_channel
 
-* samples
+- документация на весь АПИ
+  - fox:create_channel/1 -- за канал отвечает потребитель, либа дальше этот канал не использует и не мониторит
+    close_channel в АПИ не выставляем, пользователь может вызывать сам amqp_channel:close(Pid)
+
+- как работает либа (структура потоков и т.д.)
+
+- samples
+
 
 * info
 http://www.rabbitmq.com/erlang-client-user-guide.html

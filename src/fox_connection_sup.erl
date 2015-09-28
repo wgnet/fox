@@ -1,7 +1,7 @@
 -module(fox_connection_sup).
 -behaviour(supervisor).
 
--export([start_link/3, init/1, create_channel/1, subscribe/3, stop/1]).
+-export([start_link/3, init/1, create_channel/1, subscribe/3, unsubscribe/2, stop/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -40,6 +40,18 @@ subscribe(SupPid, ConsumerModule, ConsumerModuleArgs) ->
     case get_less_busy_worker(SupPid) of
         {ok, Worker} -> fox_connection_worker:subscribe(Worker, ConsumerModule, ConsumerModuleArgs);
         {error, Reason} -> {error, Reason}
+    end.
+
+
+-spec unsubscribe(pid(), pid()) -> ok | {error, term()}.
+unsubscribe(SupPid, ChannelPid) ->
+    Res = lists:map(fun({_, ChildPid, _, _}) ->
+                            fox_connection_worker:unsubscribe(ChildPid, ChannelPid)
+                    end,
+                    supervisor:which_children(SupPid)),
+    case lists:member(ok, Res) of
+        true -> ok;
+        false -> {error, connection_not_found}
     end.
 
 

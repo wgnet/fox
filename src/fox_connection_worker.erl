@@ -1,7 +1,7 @@
 -module(fox_connection_worker).
 -behavior(gen_server).
 
--export([start_link/1, get_num_channels/1, create_channel/1, subscribe/3, stop/1]).
+-export([start_link/1, get_num_channels/1, create_channel/1, subscribe/3, unsubscribe/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -13,6 +13,7 @@
           connection :: pid(),
           connection_ref :: reference(),
           params_network :: #amqp_params_network{},
+          consumers :: map(),
           reconnect_attempt = 0 :: non_neg_integer()
          }).
 
@@ -43,6 +44,11 @@ subscribe(Pid, ConsumerModule, ConsumerModuleArgs) ->
     gen_server:call(Pid, {subscribe, ConsumerModule, ConsumerModuleArgs}).
 
 
+-spec unsubscribe(pid(), pid()) -> ok | {error, term()}.
+unsubscribe(Pid, ChannelPid) ->
+    gen_server:call(Pid, {unsubscribe, ChannelPid}).
+
+
 -spec stop(pid()) -> ok.
 stop(Pid) ->
     gen_server:call(Pid, stop).
@@ -54,7 +60,7 @@ stop(Pid) ->
 init(Params) ->
     herd_rand:init_crypto(),
     self() ! connect,
-    {ok, #state{params_network = Params}}.
+    {ok, #state{params_network = Params, consumers = maps:new()}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
@@ -68,18 +74,30 @@ handle_call(create_channel, _From, #state{connection = Connection} = State) ->
             end,
     {reply, Reply, State};
 
-handle_call({subscribe, ConsumerModule, ConsumerModuleArgs}, _From, #state{connection = Connection} = State) ->
-    Reply = case Connection of
-                undefined -> {error, no_connection};
-                Pid -> case amqp_connection:open_channel(Pid) of
-                           {ok, ChannelPid} ->
-                               {ok, _Consumer} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerModuleArgs),
-                               %% TODO monitor channel and consumer
-                               {ok, ChannelPid};
-                           {error, Reason} -> {error, Reason}
-                       end
-            end,
-    {reply, Reply, State};
+handle_call({subscribe, ConsumerModule, ConsumerModuleArgs}, _From,
+            #state{connection = Connection, consumers = Consumers} = State) ->
+    case Connection of
+        undefined -> {reply, {error, no_connection}, State};
+        Pid -> case amqp_connection:open_channel(Pid) of
+                   {ok, ChannelPid} ->
+                       {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerModuleArgs),
+                       Consumers2 = maps:put(ChannelPid, ConsumerPid, Consumers),
+                       {reply, {ok, ChannelPid}, State#state{consumers = Consumers2}};
+                   {error, Reason} ->
+                       {reply, {error, Reason}, State}
+               end
+    end;
+
+handle_call({unsubscribe, ChannelPid}, _From, #state{consumers = Consumers} = State) ->
+    case maps:find(ChannelPid, Consumers) of
+        {ok, ConsumerPid} ->
+            fox_channel_consumer:stop(ConsumerPid),
+            Consumers2 = maps:remove(ChannelPid, Consumers),
+            amqp_channel:close(ChannelPid),
+            {reply, ok, State#state{consumers = Consumers2}};
+        error ->
+            {reply, {error, channel_not_found}, State}
+    end;
 
 handle_call(stop, _From, #state{connection = Connection, connection_ref = Ref,
                                 params_network = Params} = State) ->
