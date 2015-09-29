@@ -45,16 +45,8 @@
 
 * 3й уровень -- сценарии использования channel
 
-- publish (async)
-
-- publish with confirmation (не документарован, нужно разбираться)
-  https://www.rabbitmq.com/confirms.html
-
 - subscribe
   - что если мы хотим пописаться на 2 очереди?
-
-+ unsubscribe
-
 
 * Мониторинг:
 
@@ -77,6 +69,9 @@
 
 - samples
 
+* на следующие версии:
+- publish with confirmation (не документарован, нужно разбираться)
+  https://www.rabbitmq.com/confirms.html
 
 * info
 http://www.rabbitmq.com/erlang-client-user-guide.html

@@ -199,6 +199,7 @@ test_run() ->
     {ok, PChannel} = create_channel("test_pool"),
 
     publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
+    publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
 
     timer:sleep(2000),
     unsubscribe("test_pool", SChannel),

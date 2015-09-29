@@ -11,7 +11,7 @@
 -record(state, {channel_pid :: pid(),
                 consumer :: module(),
                 consumer_args :: list(),
-                consumer_tag :: binary(),
+                consumer_tags :: [binary()],
                 consumer_state :: term()
                }).
 
@@ -43,15 +43,19 @@ behaviour_info(_) ->
 init({ChannelPid, ConsumerModule, ConsumerModuleArgs}) ->
     self() ! init,
     {ok, #state{channel_pid = ChannelPid, consumer = ConsumerModule,
+                consumer_tags = [],
                 consumer_args = ConsumerModuleArgs}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
 handle_call(stop, _From, #state{channel_pid = ChannelPid,
                                 consumer = ConsumerModule,
-                                consumer_tag = Tag,
+                                consumer_tags = Tags,
                                 consumer_state = CState} = State) ->
-    amqp_channel:call(ChannelPid, #'basic.cancel'{consumer_tag = Tag}), % unsubscribe
+    %% unsubscribe
+    lists:foreach(fun(Tag) ->
+                          amqp_channel:call(ChannelPid, #'basic.cancel'{consumer_tag = Tag})
+                  end, Tags),
     try
         ConsumerModule:terminate(ChannelPid, CState)
     catch
@@ -72,38 +76,48 @@ handle_cast(Any, State) ->
 
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
-handle_info(#'basic.consume_ok'{consumer_tag = Tag}, #state{consumer_tag = Tag} = State) ->
+handle_info(#'basic.consume_ok'{consumer_tag = Tag}, #state{consumer_tags = Tags} = State) ->
+    case lists:member(Tag, Tags) of
+        true -> ok;
+        false -> error_logger:error_msg("~p got basic_consume_ok with unknown tag ~p", [?MODULE, Tag])
+    end,
     {noreply, State};
 
 handle_info({#'basic.deliver'{consumer_tag = Tag}, #amqp_msg{}} = Data,
             #state{channel_pid = ChannelPid, consumer = ConsumerModule,
-                   consumer_tag = Tag, consumer_state = CState} = State) ->
-    {ok, CState2} =
-        try
-            ConsumerModule:handle(Data, ChannelPid, CState)
-        catch
-            T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:handle~n~p:~p~nData:~p",
-                                          [ConsumerModule, T, E, Data]),
-                   {ok, CState}
-        end,
-    {noreply, State#state{consumer_state = CState2}};
+                   consumer_tags = Tags, consumer_state = CState} = State) ->
+    case lists:member(Tag, Tags) of
+        true ->
+            try
+                {ok, CState2} = ConsumerModule:handle(Data, ChannelPid, CState),
+                {noreply, State#state{consumer_state = CState2}}
+            catch
+                T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:handle~n~p:~p~nData:~p",
+                                              [ConsumerModule, T, E, Data]),
+                       {noreply, State}
+            end;
+        false -> error_logger:error_msg("~p got basic.deliver with unknown tag ~p", [?MODULE, Tag]),
+                 {noreply, State}
+    end;
 
 handle_info(init, #state{channel_pid = ChannelPid,
                          consumer = ConsumerModule,
                          consumer_args = ConsumerArgs} = State) ->
-    {Tag2, CState2} =
-        try ConsumerModule:init(ChannelPid, ConsumerArgs) of
-            {ok, CState} -> {undefined, CState};
-            {subscribe, Queue, CState} ->
-                Sub = #'basic.consume'{queue = Queue},
-                #'basic.consume_ok'{consumer_tag = Tag} = amqp_channel:subscribe(ChannelPid, Sub, self()),
-                {Tag, CState}
-        catch
-            T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:init~n~p:~p",
-                                          [ConsumerModule, T, E]),
-                   {undefined, undefined}
-        end,
-    {noreply, State#state{consumer_tag = Tag2, consumer_state = CState2}};
+    try ConsumerModule:init(ChannelPid, ConsumerArgs) of
+        {ok, CState} -> {[], CState};
+        {subscribe, Queues, CState} ->
+            Tags = lists:map(fun(Queue) ->
+                                     Sub = #'basic.consume'{queue = Queue},
+                                     #'basic.consume_ok'{consumer_tag = Tag} =
+                                         amqp_channel:subscribe(ChannelPid, Sub, self()),
+                                     Tag
+                             end, Queues),
+            {noreply, State#state{consumer_tags = Tags, consumer_state = CState}}
+    catch
+        T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:init~n~p:~p",
+                                      [ConsumerModule, T, E]),
+               {noreply, State}
+    end;
 
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
@@ -118,7 +132,3 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), term(), term()) -> gs_code_change_reply().
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
-
-
-
-%%% inner functions
