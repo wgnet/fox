@@ -8,6 +8,7 @@
          declare_exchange/2, declare_exchange/3,
          declare_queue/2, declare_queue/3,
          bind_queue/4, bind_queue/5,
+         unbind_queue/4, unbind_queue/5,
          test_run/0]).
 
 -include("fox.hrl").
@@ -116,6 +117,22 @@ bind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
         {error, Reason} -> {error, Reason}
     end.
 
+
+-spec unbind_queue(pid(), binary(), binary(), binary()) -> ok | {error, term()}.
+unbind_queue(ChannelPid, Queue, Exchange, RoutingKey) ->
+    unbind_queue(ChannelPid, Queue, Exchange, RoutingKey, maps:new()).
+
+
+-spec unbind_queue(pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
+unbind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
+    QueueUnbind = fox_utils:map_to_queue_unbind(Params),
+    QueueUnbind2 = QueueUnbind#'queue.unbind'{queue = Queue,
+                                              exchange = Exchange,
+                                              routing_key = RoutingKey},
+    case amqp_channel:call(ChannelPid, QueueUnbind2) of
+        #'queue.unbind_ok'{} -> ok;
+        {error, Reason} -> {error, Reason}
+    end.
 
 
 -spec(test_run() -> ok).

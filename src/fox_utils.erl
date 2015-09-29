@@ -8,6 +8,7 @@
          map_to_exchange_declare/1,
          map_to_queue_declare/1,
          map_to_queue_bind/1,
+         map_to_queue_unbind/1,
          close_connection/1, close_channel/1
         ]).
 
@@ -143,6 +144,17 @@ map_to_queue_bind(Params) ->
        exchange = maps:get(exchange, Params, <<>>),
        routing_key = maps:get(routing_key, Params, <<>>),
        nowait = maps:get(nowait, Params, false),
+       arguments = maps:get(arguments, Params, [])
+      }.
+
+
+-spec map_to_queue_unbind(map()) -> #'queue.unbind'{}.
+map_to_queue_unbind(Params) ->
+    #'queue.unbind'{
+       ticket = maps:get(ticket, Params, 0),
+       queue = maps:get(queue, Params, <<>>),
+       exchange = maps:get(exchange, Params, <<>>),
+       routing_key = maps:get(routing_key, Params, <<>>),
        arguments = maps:get(arguments, Params, [])
       }.
 

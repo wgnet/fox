@@ -23,7 +23,7 @@ init(ChannelPid, Args) ->
     ok = fox:declare_queue(ChannelPid, Queue),
     ok = fox:bind_queue(ChannelPid, Queue, Exchange, RoutingKey),
 
-    State = [],
+    State = {Queue, Exchange, RoutingKey},
     {subscribe, Queue, State}.
 
 
@@ -41,4 +41,6 @@ handle(Data, _ChannelPid, State) ->
 -spec terminate(pid(), state()) -> ok.
 terminate(ChannelPid, State) ->
     ?d("sample_channel_consumer:terminate channel:~p, state:~p", [ChannelPid, State]),
+    {Queue, Exchange, RoutingKey} = State,
+    ok = fox:unbind_queue(ChannelPid, Queue, Exchange, RoutingKey),
     ok.
