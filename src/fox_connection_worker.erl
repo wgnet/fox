@@ -100,12 +100,16 @@ handle_call({unsubscribe, ChannelPid}, _From, #state{consumers = Consumers} = St
     end;
 
 handle_call(stop, _From, #state{connection = Connection, connection_ref = Ref,
-                                params_network = Params} = State) ->
+                                params_network = Params, consumers = Consumers} = State) ->
     error_logger:info_msg("fox_connection_worker close connection ~s",
                           [fox_utils:params_network_to_str(Params)]),
     case Connection of
         undefined -> do_nothing;
         Pid ->
+            maps:map(fun(ChannelPid, ConsumerPid) ->
+                             fox_channel_consumer:stop(ConsumerPid),
+                             amqp_channel:close(ChannelPid)
+                     end, Consumers),
             erlang:demonitor(Ref, [flush]),
             try
                 amqp_connection:close(Pid)
@@ -114,7 +118,9 @@ handle_call(stop, _From, #state{connection = Connection, connection_ref = Ref,
                 exit:{noproc, _} -> ok
             end
     end,
-    {stop, normal, ok, State#state{connection = undefined}};
+    {stop, normal, ok, State#state{connection = undefined,
+                                   connection_ref = undefined,
+                                   consumers = maps:new()}};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),

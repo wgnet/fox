@@ -47,7 +47,27 @@
 АПИ для основных сценариев
 сделаю везде мапы как альтернативу рекордам
 
-- declare exchange, declare queue, bind queue
+- declare_exchange(Name :: binary(), Options :: map())
+  record('exchange.declare', {ticket = 0, exchange, type = <<"direct">>, passive = false, durable = false, auto_delete = false, internal = false, nowait = false, arguments = []}).
+
+- delete_exchange(Name :: binary(), Options :: map())
+  record('exchange.delete', {ticket = 0, exchange, if_unused = false, nowait = false}).
+
+- declare queue
+  record('queue.declare', {ticket = 0, queue = <<"">>, passive = false, durable = false, exclusive = false, auto_delete = false, nowait = false, arguments = []}).
+
+- delete queue
+  record('queue.delete', {ticket = 0, queue = <<"">>, if_unused = false, if_empty = false, nowait = false}).
+
+- bind queue
+  record('queue.bind', {ticket = 0, queue = <<"">>, exchange, routing_key = <<"">>, nowait = false, arguments = []}).
+
+- unbind queue
+  record('queue.unbind', {ticket = 0, queue = <<"">>, exchange, routing_key = <<"">>, arguments = []}).
+
+- rabbit_framing.hrl
+  надо бы выяснить смысл всех операций
+  может что-то еще нужно добавить в АПИ
 
 - publish (async)
 

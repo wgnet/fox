@@ -88,9 +88,10 @@ test_run() ->
     Message = #amqp_msg{payload = <<"Hello there!">>},
     amqp_channel:cast(PChannel, Publish, Message),
 
-    Res = unsubscribe("test_pool", SChannel),
-    ?d("unsubscribe ~p", [Res]),
+    %% unsubscribe("test_pool", SChannel),
 
-    amqp_channel:close(PChannel),
+    %% close_connection_pool("test_pool"),
+
+    %% amqp_channel:close(PChannel),
 
     ok.
