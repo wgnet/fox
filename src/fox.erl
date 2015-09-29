@@ -11,6 +11,7 @@
          delete_queue/2, delete_queue/3,
          bind_queue/4, bind_queue/5,
          unbind_queue/4, unbind_queue/5,
+         publish/4, publish/5,
          test_run/0]).
 
 -include("fox.hrl").
@@ -166,6 +167,20 @@ unbind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
     end.
 
 
+-spec publish(pid(), binary(), binary(), binary()) -> ok | {error, term()}.
+publish(ChannelPid, Exchange, RoutingKey, Payload) ->
+    publish(ChannelPid, Exchange, RoutingKey, Payload, maps:new()).
+
+
+-spec publish(pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
+publish(ChannelPid, Exchange, RoutingKey, Payload, Params) ->
+    Publish = fox_utils:map_to_basic_publish(Params),
+    Publish2 = Publish#'basic.publish'{exchange = Exchange, routing_key = RoutingKey},
+    PBasic = fox_utils:map_to_pbasic(Params),
+    Message = #amqp_msg{payload = Payload, props = PBasic},
+    amqp_channel:cast(ChannelPid, Publish2, Message).
+
+
 -spec(test_run() -> ok).
 test_run() ->
     application:ensure_all_started(fox),
@@ -183,9 +198,7 @@ test_run() ->
     {ok, SChannel} = subscribe("test_pool", sample_channel_consumer),
     {ok, PChannel} = create_channel("test_pool"),
 
-    Publish = #'basic.publish'{exchange = <<"my_exchange">>, routing_key = <<"my_key">>},
-    Message = #amqp_msg{payload = <<"Hello there!">>},
-    amqp_channel:cast(PChannel, Publish, Message),
+    publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
 
     timer:sleep(2000),
     unsubscribe("test_pool", SChannel),

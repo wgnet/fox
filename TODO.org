@@ -45,23 +45,6 @@
 
 * 3й уровень -- сценарии использования channel
 
-+ declare_exchange/2,3
-+ declare_queue/2,3
-+ bind queue/4,5
-+ unbind queue
-
-- delete queue
-  record('queue.delete', {ticket = 0, queue = <<"">>, if_unused = false, if_empty = false, nowait = false}).
-- delete_exchange(Name :: binary(), Options :: map())
-  record('exchange.delete', {ticket = 0, exchange, if_unused = false, nowait = false}).
-
-- вызывать их в sample_consumer:terminate
-
-- rabbit_framing.hrl
-  надо бы выяснить смысл всех операций
-  может что-то еще нужно добавить в АПИ
-  'basic.qos' используется в NC
-
 - publish (async)
 
 - publish with confirmation (не документарован, нужно разбираться)

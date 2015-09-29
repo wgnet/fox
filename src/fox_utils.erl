@@ -11,6 +11,8 @@
          map_to_queue_delete/1,
          map_to_queue_bind/1,
          map_to_queue_unbind/1,
+         map_to_basic_publish/1,
+         map_to_pbasic/1,
          close_connection/1,
          close_channel/1
         ]).
@@ -180,6 +182,37 @@ map_to_queue_unbind(Params) ->
        exchange = maps:get(exchange, Params, <<>>),
        routing_key = maps:get(routing_key, Params, <<>>),
        arguments = maps:get(arguments, Params, [])
+      }.
+
+
+-spec map_to_basic_publish(map()) -> #'basic.publish'{}.
+map_to_basic_publish(Params) ->
+    #'basic.publish'{
+       ticket = maps:get(ticket, Params, 0),
+       exchange = maps:get(exchange, Params, <<>>),
+       routing_key = maps:get(routing_key, Params, <<>>),
+       mandatory = maps:get(mandatory, Params, false),
+       immediate = maps:get(immediate, Params, false)
+      }.
+
+
+-spec map_to_pbasic(map()) -> #'P_basic'{}.
+map_to_pbasic(Params) ->
+    #'P_basic'{
+       content_type = maps:get(content_type, Params, undefined),
+       content_encoding = maps:get(content_encoding, Params, undefined),
+       headers = maps:get(headers, Params, undefined),
+       delivery_mode = maps:get(delivery_mode, Params, undefined),
+       priority = maps:get(priority, Params, undefined),
+       correlation_id = maps:get(correlation_id, Params, undefined),
+       reply_to = maps:get(reply_to, Params, undefined),
+       expiration = maps:get(expiration, Params, undefined),
+       message_id = maps:get(message_id, Params, undefined),
+       timestamp = maps:get(timestamp, Params, undefined),
+       type = maps:get(type, Params, undefined),
+       user_id = maps:get(user_id, Params, undefined),
+       app_id = maps:get(app_id, Params, undefined),
+       cluster_id = maps:get(cluster_id, Params, undefined)
       }.
 
 
