@@ -5,7 +5,8 @@
          close_connection_pool/1,
          create_channel/1,
          subscribe/2, subscribe/3, unsubscribe/2,
-         declare_exchange/2,
+         declare_exchange/2, declare_exchange/3,
+         declare_queue/2, declare_queue/3,
          test_run/0]).
 
 -include("fox.hrl").
@@ -83,6 +84,21 @@ declare_exchange(ChannelPid, Name, Params) ->
     end.
 
 
+-spec declare_queue(pid(), binary()) -> ok | {error, term()}.
+declare_queue(ChannelPid, Name) when is_binary(Name) ->
+    declare_queue(ChannelPid, Name, maps:new()).
+
+
+-spec declare_queue(pid(), binary(), map()) -> ok | {error, term()}.
+declare_queue(ChannelPid, Name, Params) ->
+    QueueDeclare = fox_utils:map_to_queue_declare(Params),
+    QueueDeclare2 = QueueDeclare#'queue.declare'{queue = Name},
+    case amqp_channel:call(ChannelPid, QueueDeclare2) of
+        #'queue.declare_ok'{} -> ok;
+        {error, Reason} -> {error, Reason}
+    end.
+
+
 -spec(test_run() -> ok).
 test_run() ->
     application:ensure_all_started(fox),
@@ -104,6 +120,7 @@ test_run() ->
     Message = #amqp_msg{payload = <<"Hello there!">>},
     amqp_channel:cast(PChannel, Publish, Message),
 
+    timer:sleep(2000),
     unsubscribe("test_pool", SChannel),
     amqp_channel:close(PChannel),
     close_connection_pool("test_pool"),

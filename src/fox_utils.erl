@@ -6,6 +6,7 @@
          validate_params_network_types/1,
          validate_consumer_behaviour/1,
          map_to_exchange_declare/1,
+         map_to_queue_declare/1,
          close_connection/1, close_channel/1
         ]).
 
@@ -106,16 +107,31 @@ validate_consumer_behaviour(Module) ->
 
 -spec map_to_exchange_declare(map()) -> #'exchange.declare'{}.
 map_to_exchange_declare(Params) ->
-    #'exchange.declare'{exchange = maps:get(exchange, Params, <<>>),
-                        ticket = maps:get(ticket, Params, 0),
-                        type = maps:get(type, Params, <<"direct">>),
-                        passive = maps:get(passive, Params, false),
-                        durable = maps:get(durable, Params, false),
-                        auto_delete = maps:get(auto_delete, Params, false),
-                        internal = maps:get(internal, Params, false),
-                        nowait = maps:get(nowait, Params, false),
-                        arguments = maps:get(arguments, Params, [])
-                       }.
+    #'exchange.declare'{
+       ticket = maps:get(ticket, Params, 0),
+       exchange = maps:get(exchange, Params, <<>>),
+       type = maps:get(type, Params, <<"direct">>),
+       passive = maps:get(passive, Params, false),
+       durable = maps:get(durable, Params, false),
+       auto_delete = maps:get(auto_delete, Params, false),
+       internal = maps:get(internal, Params, false),
+       nowait = maps:get(nowait, Params, false),
+       arguments = maps:get(arguments, Params, [])
+      }.
+
+
+-spec map_to_queue_declare(map()) -> #'queue.declare'{}.
+map_to_queue_declare(Params) ->
+    #'queue.declare'{
+       ticket = maps:get(ticket, Params, 0),
+       queue = maps:get(queue, Params, <<>>),
+       passive = maps:get(passive, Params, false),
+       durable = maps:get(durable, Params, false),
+       exclusive = maps:get(exclusive, Params, false),
+       auto_delete = maps:get(auto_delete, Params, false),
+       nowait = maps:get(nowait, Params, false),
+       arguments = maps:get(arguments, Params, [])
+      }.
 
 
 -spec close_connection(pid()) -> ok.

@@ -20,7 +20,7 @@ init(ChannelPid, Args) ->
     RoutingKey = <<"my_key">>,
 
     ok = fox:declare_exchange(ChannelPid, Exchange),
-    #'queue.declare_ok'{} = amqp_channel:call(ChannelPid, #'queue.declare'{queue = Queue}),
+    ok = fox:declare_queue(ChannelPid, Queue),
     #'queue.bind_ok'{} =
         amqp_channel:call(ChannelPid, #'queue.bind'{queue = Queue,
                                                     exchange = Exchange,
