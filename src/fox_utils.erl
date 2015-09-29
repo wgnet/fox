@@ -4,7 +4,9 @@
          map_to_params_network/1,
          params_network_to_str/1,
          validate_params_network_types/1,
-         validate_consumer_behaviour/1
+         validate_consumer_behaviour/1,
+         map_to_exchange_declare/1,
+         close_connection/1, close_channel/1
         ]).
 
 -include("fox.hrl").
@@ -99,4 +101,38 @@ validate_consumer_behaviour(Module) ->
     case NotExported of
         [] -> true;
         _ -> throw({invalid_consumer_module, {should_be_exported, NotExported}})
+    end.
+
+
+-spec map_to_exchange_declare(map()) -> #'exchange.declare'{}.
+map_to_exchange_declare(Params) ->
+    #'exchange.declare'{exchange = maps:get(exchange, Params, <<>>),
+                        ticket = maps:get(ticket, Params, 0),
+                        type = maps:get(type, Params, <<"direct">>),
+                        passive = maps:get(passive, Params, false),
+                        durable = maps:get(durable, Params, false),
+                        auto_delete = maps:get(auto_delete, Params, false),
+                        internal = maps:get(internal, Params, false),
+                        nowait = maps:get(nowait, Params, false),
+                        arguments = maps:get(arguments, Params, [])
+                       }.
+
+
+-spec close_connection(pid()) -> ok.
+close_connection(Pid) ->
+    try
+        amqp_connection:close(Pid), ok
+    catch
+        %% connection may already be closed
+        exit:{noproc, _} -> ok
+    end.
+
+
+-spec close_channel(pid()) -> ok.
+close_channel(Pid) ->
+    try
+        amqp_channel:close(Pid), ok
+    catch
+        %% channel may already be closed
+        exit:{noproc, _} -> ok
     end.

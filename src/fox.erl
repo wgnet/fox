@@ -5,6 +5,7 @@
          close_connection_pool/1,
          create_channel/1,
          subscribe/2, subscribe/3, unsubscribe/2,
+         declare_exchange/2,
          test_run/0]).
 
 -include("fox.hrl").
@@ -67,6 +68,21 @@ unsubscribe(ConnectionName, ChannelPid) ->
     fox_connection_pool_sup:unsubscribe(ConnectionName2, ChannelPid).
 
 
+-spec declare_exchange(pid(), binary()) -> ok | {error, term()}.
+declare_exchange(ChannelPid, Name) when is_binary(Name) ->
+    declare_exchange(ChannelPid, Name, maps:new()).
+
+
+-spec declare_exchange(pid(), binary(), map()) -> ok | {error, term()}.
+declare_exchange(ChannelPid, Name, Params) ->
+    ExchangeDeclare = fox_utils:map_to_exchange_declare(Params),
+    ExchangeDeclare2 = ExchangeDeclare#'exchange.declare'{exchange = Name},
+    case amqp_channel:call(ChannelPid, ExchangeDeclare2) of
+        #'exchange.declare_ok'{} -> ok;
+        {error, Reason} -> {error, Reason}
+    end.
+
+
 -spec(test_run() -> ok).
 test_run() ->
     application:ensure_all_started(fox),
@@ -88,10 +104,8 @@ test_run() ->
     Message = #amqp_msg{payload = <<"Hello there!">>},
     amqp_channel:cast(PChannel, Publish, Message),
 
-    %% unsubscribe("test_pool", SChannel),
-
+    unsubscribe("test_pool", SChannel),
     %% close_connection_pool("test_pool"),
 
-    %% amqp_channel:close(PChannel),
-
+    amqp_channel:close(PChannel),
     ok.

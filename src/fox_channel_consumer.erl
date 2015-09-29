@@ -10,6 +10,7 @@
 
 -record(state, {channel_pid :: pid(),
                 consumer :: module(),
+                consumer_args :: list(),
                 consumer_tag :: binary(),
                 consumer_state :: term()
                }).
@@ -40,23 +41,21 @@ behaviour_info(_) ->
 
 -spec init(gs_args()) -> gs_init_reply().
 init({ChannelPid, ConsumerModule, ConsumerModuleArgs}) ->
-    {Tag2, State2} =
-        case ConsumerModule:init(ChannelPid, ConsumerModuleArgs) of
-            {ok, State} -> {undefined, State};
-            {subscribe, Queue, State} ->
-                Sub = #'basic.consume'{queue = Queue},
-                #'basic.consume_ok'{consumer_tag = Tag} = amqp_channel:subscribe(ChannelPid, Sub, self()),
-                {Tag, State}
-        end,
+    self() ! init,
     {ok, #state{channel_pid = ChannelPid, consumer = ConsumerModule,
-                consumer_tag = Tag2, consumer_state = State2}}.
+                consumer_args = ConsumerModuleArgs}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
 handle_call(stop, _From, #state{channel_pid = ChannelPid,
                                 consumer = ConsumerModule,
                                 consumer_state = CState} = State) ->
-    ConsumerModule:terminate(ChannelPid, CState),
+    try
+        ConsumerModule:terminate(ChannelPid, CState)
+    catch
+        T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:terminate~n~p:~p",
+                                      [ConsumerModule, T, E])
+    end,
     {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
@@ -77,8 +76,32 @@ handle_info(#'basic.consume_ok'{consumer_tag = Tag}, #state{consumer_tag = Tag} 
 handle_info({#'basic.deliver'{consumer_tag = Tag}, #amqp_msg{}} = Data,
             #state{channel_pid = ChannelPid, consumer = ConsumerModule,
                    consumer_tag = Tag, consumer_state = CState} = State) ->
-    {ok, CState2} = ConsumerModule:handle(Data, ChannelPid, CState),
+    {ok, CState2} =
+        try
+            ConsumerModule:handle(Data, ChannelPid, CState)
+        catch
+            T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:handle~n~p:~p~nData:~p",
+                                          [ConsumerModule, T, E, Data]),
+                   {ok, CState}
+        end,
     {noreply, State#state{consumer_state = CState2}};
+
+handle_info(init, #state{channel_pid = ChannelPid,
+                         consumer = ConsumerModule,
+                         consumer_args = ConsumerArgs} = State) ->
+    {Tag2, CState2} =
+        try ConsumerModule:init(ChannelPid, ConsumerArgs) of
+            {ok, CState} -> {undefined, CState};
+            {subscribe, Queue, CState} ->
+                Sub = #'basic.consume'{queue = Queue},
+                #'basic.consume_ok'{consumer_tag = Tag} = amqp_channel:subscribe(ChannelPid, Sub, self()),
+                {Tag, CState}
+        catch
+            T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:init~n~p:~p",
+                                          [ConsumerModule, T, E]),
+                   {undefined, undefined}
+        end,
+    {noreply, State#state{consumer_tag = Tag2, consumer_state = CState2}};
 
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),

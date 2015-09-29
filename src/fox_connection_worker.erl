@@ -93,7 +93,7 @@ handle_call({unsubscribe, ChannelPid}, _From, #state{consumers = Consumers} = St
         {ok, ConsumerPid} ->
             fox_channel_consumer:stop(ConsumerPid),
             Consumers2 = maps:remove(ChannelPid, Consumers),
-            amqp_channel:close(ChannelPid),
+            fox_utils:close_channel(ChannelPid),
             {reply, ok, State#state{consumers = Consumers2}};
         error ->
             {reply, {error, channel_not_found}, State}
@@ -108,11 +108,11 @@ handle_call(stop, _From, #state{connection = Connection, connection_ref = Ref,
         Pid ->
             maps:map(fun(ChannelPid, ConsumerPid) ->
                              fox_channel_consumer:stop(ConsumerPid),
-                             amqp_channel:close(ChannelPid)
+                             fox_utils:close_channel(ChannelPid)
                      end, Consumers),
             erlang:demonitor(Ref, [flush]),
             try
-                amqp_connection:close(Pid)
+                fox_utils:close_connection(Pid)
             catch
                 %% connection may be already closed on server
                 exit:{noproc, _} -> ok
