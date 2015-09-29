@@ -49,7 +49,9 @@ init({ChannelPid, ConsumerModule, ConsumerModuleArgs}) ->
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
 handle_call(stop, _From, #state{channel_pid = ChannelPid,
                                 consumer = ConsumerModule,
+                                consumer_tag = Tag,
                                 consumer_state = CState} = State) ->
+    amqp_channel:call(ChannelPid, #'basic.cancel'{consumer_tag = Tag}), % unsubscribe
     try
         ConsumerModule:terminate(ChannelPid, CState)
     catch

@@ -105,7 +105,7 @@ test_run() ->
     amqp_channel:cast(PChannel, Publish, Message),
 
     unsubscribe("test_pool", SChannel),
-    %% close_connection_pool("test_pool"),
-
     amqp_channel:close(PChannel),
+    close_connection_pool("test_pool"),
+
     ok.

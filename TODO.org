@@ -50,9 +50,6 @@
 + declare_exchange(Name :: binary(), Options :: map())
   record('exchange.declare', {ticket = 0, exchange, type = <<"direct">>, passive = false, durable = false, auto_delete = false, internal = false, nowait = false, arguments = []}).
 
-- unsubscribe падает
-- close_connection_pool тоже проверить
-
 - delete_exchange(Name :: binary(), Options :: map())
   record('exchange.delete', {ticket = 0, exchange, if_unused = false, nowait = false}).
 

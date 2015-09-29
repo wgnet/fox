@@ -19,13 +19,12 @@ init(ChannelPid, Args) ->
     Queue = <<"my_queue">>,
     RoutingKey = <<"my_key">>,
 
-    R = fox:declare_exchange(ChannelPid, Exchange),
-    ?d("de ~p", [R]),
-    %% #'queue.declare_ok'{} = amqp_channel:call(ChannelPid, #'queue.declare'{queue = Queue}),
-    %% #'queue.bind_ok'{} =
-    %%     amqp_channel:call(ChannelPid, #'queue.bind'{queue = Queue,
-    %%                                                 exchange = Exchange,
-    %%                                                 routing_key = RoutingKey}),
+    ok = fox:declare_exchange(ChannelPid, Exchange),
+    #'queue.declare_ok'{} = amqp_channel:call(ChannelPid, #'queue.declare'{queue = Queue}),
+    #'queue.bind_ok'{} =
+        amqp_channel:call(ChannelPid, #'queue.bind'{queue = Queue,
+                                                    exchange = Exchange,
+                                                    routing_key = RoutingKey}),
     State = [],
     {subscribe, Queue, State}.
 
