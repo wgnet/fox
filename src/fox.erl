@@ -7,6 +7,7 @@
          subscribe/2, subscribe/3, unsubscribe/2,
          declare_exchange/2, declare_exchange/3,
          declare_queue/2, declare_queue/3,
+         bind_queue/4, bind_queue/5,
          test_run/0]).
 
 -include("fox.hrl").
@@ -97,6 +98,24 @@ declare_queue(ChannelPid, Name, Params) ->
         #'queue.declare_ok'{} -> ok;
         {error, Reason} -> {error, Reason}
     end.
+
+
+-spec bind_queue(pid(), binary(), binary(), binary()) -> ok | {error, term()}.
+bind_queue(ChannelPid, Queue, Exchange, RoutingKey) ->
+    bind_queue(ChannelPid, Queue, Exchange, RoutingKey, maps:new()).
+
+
+-spec bind_queue(pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
+bind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
+    QueueBind = fox_utils:map_to_queue_bind(Params),
+    QueueBind2 = QueueBind#'queue.bind'{queue = Queue,
+                                        exchange = Exchange,
+                                        routing_key = RoutingKey},
+    case amqp_channel:call(ChannelPid, QueueBind2) of
+        #'queue.bind_ok'{} -> ok;
+        {error, Reason} -> {error, Reason}
+    end.
+
 
 
 -spec(test_run() -> ok).

@@ -7,6 +7,7 @@
          validate_consumer_behaviour/1,
          map_to_exchange_declare/1,
          map_to_queue_declare/1,
+         map_to_queue_bind/1,
          close_connection/1, close_channel/1
         ]).
 
@@ -129,6 +130,18 @@ map_to_queue_declare(Params) ->
        durable = maps:get(durable, Params, false),
        exclusive = maps:get(exclusive, Params, false),
        auto_delete = maps:get(auto_delete, Params, false),
+       nowait = maps:get(nowait, Params, false),
+       arguments = maps:get(arguments, Params, [])
+      }.
+
+
+-spec map_to_queue_bind(map()) -> #'queue.bind'{}.
+map_to_queue_bind(Params) ->
+    #'queue.bind'{
+       ticket = maps:get(ticket, Params, 0),
+       queue = maps:get(queue, Params, <<>>),
+       exchange = maps:get(exchange, Params, <<>>),
+       routing_key = maps:get(routing_key, Params, <<>>),
        nowait = maps:get(nowait, Params, false),
        arguments = maps:get(arguments, Params, [])
       }.
