@@ -105,13 +105,12 @@ handle_info(init, #state{channel_pid = ChannelPid,
                          consumer_args = ConsumerArgs} = State) ->
     try ConsumerModule:init(ChannelPid, ConsumerArgs) of
         {ok, CState} -> {[], CState};
-        {subscribe, Queues, CState} ->
-            Tags = lists:map(fun(Queue) ->
-                                     Sub = #'basic.consume'{queue = Queue},
+        {{subscribe, BConsumes}, CState} ->
+            Tags = lists:map(fun(BConsume) ->
                                      #'basic.consume_ok'{consumer_tag = Tag} =
-                                         amqp_channel:subscribe(ChannelPid, Sub, self()),
+                                         amqp_channel:subscribe(ChannelPid, BConsume, self()),
                                      Tag
-                             end, Queues),
+                             end, BConsumes),
             {noreply, State#state{consumer_tags = Tags, consumer_state = CState}}
     catch
         T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:init~n~p:~p",

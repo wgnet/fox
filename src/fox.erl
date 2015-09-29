@@ -196,12 +196,15 @@ test_run() ->
 
     create_connection_pool("test_pool", Params),
     {ok, SChannel} = subscribe("test_pool", sample_channel_consumer),
-    {ok, PChannel} = create_channel("test_pool"),
 
+    timer:sleep(500),
+
+    {ok, PChannel} = create_channel("test_pool"),
     publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
     publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
 
-    timer:sleep(2000),
+    timer:sleep(1000),
+
     unsubscribe("test_pool", SChannel),
     amqp_channel:close(PChannel),
     close_connection_pool("test_pool"),
