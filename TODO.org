@@ -48,9 +48,8 @@
 + declare_exchange/2,3
 + declare_queue/2,3
 + bind queue/4,5
++ unbind queue
 
-- unbind queue
-  record('queue.unbind', {ticket = 0, queue = <<"">>, exchange, routing_key = <<"">>, arguments = []}).
 - delete queue
   record('queue.delete', {ticket = 0, queue = <<"">>, if_unused = false, if_empty = false, nowait = false}).
 - delete_exchange(Name :: binary(), Options :: map())

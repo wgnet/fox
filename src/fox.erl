@@ -6,7 +6,9 @@
          create_channel/1,
          subscribe/2, subscribe/3, unsubscribe/2,
          declare_exchange/2, declare_exchange/3,
+         delete_exchange/2, delete_exchange/3,
          declare_queue/2, declare_queue/3,
+         delete_queue/2, delete_queue/3,
          bind_queue/4, bind_queue/5,
          unbind_queue/4, unbind_queue/5,
          test_run/0]).
@@ -85,6 +87,20 @@ declare_exchange(ChannelPid, Name, Params) ->
         {error, Reason} -> {error, Reason}
     end.
 
+-spec delete_exchange(pid(), binary()) -> ok | {error, term()}.
+delete_exchange(ChannelPid, Name) when is_binary(Name) ->
+    delete_exchange(ChannelPid, Name, maps:new()).
+
+
+-spec delete_exchange(pid(), binary(), map()) -> ok | {error, term()}.
+delete_exchange(ChannelPid, Name, Params) ->
+    ExchangeDelete = fox_utils:map_to_exchange_delete(Params),
+    ExchangeDelete2 = ExchangeDelete#'exchange.delete'{exchange = Name},
+    case amqp_channel:call(ChannelPid, ExchangeDelete2) of
+        #'exchange.delete_ok'{} -> ok;
+        {error, Reason} -> {error, Reason}
+    end.
+
 
 -spec declare_queue(pid(), binary()) -> ok | {error, term()}.
 declare_queue(ChannelPid, Name) when is_binary(Name) ->
@@ -97,6 +113,21 @@ declare_queue(ChannelPid, Name, Params) ->
     QueueDeclare2 = QueueDeclare#'queue.declare'{queue = Name},
     case amqp_channel:call(ChannelPid, QueueDeclare2) of
         #'queue.declare_ok'{} -> ok;
+        {error, Reason} -> {error, Reason}
+    end.
+
+
+-spec delete_queue(pid(), binary()) -> ok | {error, term()}.
+delete_queue(ChannelPid, Name) when is_binary(Name) ->
+    delete_queue(ChannelPid, Name, maps:new()).
+
+
+-spec delete_queue(pid(), binary(), map()) -> ok | {error, term()}.
+delete_queue(ChannelPid, Name, Params) ->
+    QueueDelete = fox_utils:map_to_queue_delete(Params),
+    QueueDelete2 = QueueDelete#'queue.delete'{queue = Name},
+    case amqp_channel:call(ChannelPid, QueueDelete2) of
+        #'queue.delete_ok'{} -> ok;
         {error, Reason} -> {error, Reason}
     end.
 

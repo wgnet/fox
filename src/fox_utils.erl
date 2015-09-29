@@ -6,10 +6,13 @@
          validate_params_network_types/1,
          validate_consumer_behaviour/1,
          map_to_exchange_declare/1,
+         map_to_exchange_delete/1,
          map_to_queue_declare/1,
+         map_to_queue_delete/1,
          map_to_queue_bind/1,
          map_to_queue_unbind/1,
-         close_connection/1, close_channel/1
+         close_connection/1,
+         close_channel/1
         ]).
 
 -include("fox.hrl").
@@ -122,6 +125,16 @@ map_to_exchange_declare(Params) ->
       }.
 
 
+-spec map_to_exchange_delete(map()) -> #'exchange.delete'{}.
+map_to_exchange_delete(Params) ->
+    #'exchange.delete'{
+       ticket = maps:get(ticket, Params, 0),
+       exchange = maps:get(exchange, Params, <<>>),
+       if_unused = maps:get(if_unused, Params, false),
+       nowait = maps:get(nowait, Params, false)
+      }.
+
+
 -spec map_to_queue_declare(map()) -> #'queue.declare'{}.
 map_to_queue_declare(Params) ->
     #'queue.declare'{
@@ -133,6 +146,17 @@ map_to_queue_declare(Params) ->
        auto_delete = maps:get(auto_delete, Params, false),
        nowait = maps:get(nowait, Params, false),
        arguments = maps:get(arguments, Params, [])
+      }.
+
+
+-spec map_to_queue_delete(map()) -> #'queue.delete'{}.
+map_to_queue_delete(Params) ->
+    #'queue.delete'{
+       ticket = maps:get(ticket, Params, 0),
+       queue = maps:get(queue, Params, <<>>),
+       if_unused = maps:get(if_unused, Params, false),
+       if_empty = maps:get(if_empty, Params, false),
+       nowait = maps:get(nowait, Params, false)
       }.
 
 
