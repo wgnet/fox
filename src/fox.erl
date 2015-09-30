@@ -83,7 +83,7 @@ declare_exchange(ChannelPid, Name) when is_binary(Name) ->
 declare_exchange(ChannelPid, Name, Params) ->
     ExchangeDeclare = fox_utils:map_to_exchange_declare(Params),
     ExchangeDeclare2 = ExchangeDeclare#'exchange.declare'{exchange = Name},
-    case amqp_channel:call(ChannelPid, ExchangeDeclare2) of
+    case fox_utils:channel_call(ChannelPid, ExchangeDeclare2) of
         #'exchange.declare_ok'{} -> ok;
         {error, Reason} -> {error, Reason}
     end.
@@ -97,7 +97,7 @@ delete_exchange(ChannelPid, Name) when is_binary(Name) ->
 delete_exchange(ChannelPid, Name, Params) ->
     ExchangeDelete = fox_utils:map_to_exchange_delete(Params),
     ExchangeDelete2 = ExchangeDelete#'exchange.delete'{exchange = Name},
-    case amqp_channel:call(ChannelPid, ExchangeDelete2) of
+    case fox_utils:channel_call(ChannelPid, ExchangeDelete2) of
         #'exchange.delete_ok'{} -> ok;
         {error, Reason} -> {error, Reason}
     end.
@@ -112,7 +112,7 @@ declare_queue(ChannelPid, Name) when is_binary(Name) ->
 declare_queue(ChannelPid, Name, Params) ->
     QueueDeclare = fox_utils:map_to_queue_declare(Params),
     QueueDeclare2 = QueueDeclare#'queue.declare'{queue = Name},
-    case amqp_channel:call(ChannelPid, QueueDeclare2) of
+    case fox_utils:channel_call(ChannelPid, QueueDeclare2) of
         #'queue.declare_ok'{} -> ok;
         {error, Reason} -> {error, Reason}
     end.
@@ -127,7 +127,7 @@ delete_queue(ChannelPid, Name) when is_binary(Name) ->
 delete_queue(ChannelPid, Name, Params) ->
     QueueDelete = fox_utils:map_to_queue_delete(Params),
     QueueDelete2 = QueueDelete#'queue.delete'{queue = Name},
-    case amqp_channel:call(ChannelPid, QueueDelete2) of
+    case fox_utils:channel_call(ChannelPid, QueueDelete2) of
         #'queue.delete_ok'{} -> ok;
         {error, Reason} -> {error, Reason}
     end.
@@ -144,7 +144,7 @@ bind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
     QueueBind2 = QueueBind#'queue.bind'{queue = Queue,
                                         exchange = Exchange,
                                         routing_key = RoutingKey},
-    case amqp_channel:call(ChannelPid, QueueBind2) of
+    case fox_utils:channel_call(ChannelPid, QueueBind2) of
         #'queue.bind_ok'{} -> ok;
         {error, Reason} -> {error, Reason}
     end.
@@ -161,7 +161,7 @@ unbind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
     QueueUnbind2 = QueueUnbind#'queue.unbind'{queue = Queue,
                                               exchange = Exchange,
                                               routing_key = RoutingKey},
-    case amqp_channel:call(ChannelPid, QueueUnbind2) of
+    case fox_utils:channel_call(ChannelPid, QueueUnbind2) of
         #'queue.unbind_ok'{} -> ok;
         {error, Reason} -> {error, Reason}
     end.
@@ -178,7 +178,7 @@ publish(ChannelPid, Exchange, RoutingKey, Payload, Params) ->
     Publish2 = Publish#'basic.publish'{exchange = Exchange, routing_key = RoutingKey},
     PBasic = fox_utils:map_to_pbasic(Params),
     Message = #amqp_msg{payload = Payload, props = PBasic},
-    amqp_channel:cast(ChannelPid, Publish2, Message).
+    fox_utils:channel_cast(ChannelPid, Publish2, Message).
 
 
 -spec(test_run() -> ok).
@@ -205,8 +205,8 @@ test_run() ->
 
     timer:sleep(1000),
 
-    unsubscribe("test_pool", SChannel),
-    amqp_channel:close(PChannel),
-    close_connection_pool("test_pool"),
+    %%unsubscribe("test_pool", SChannel),
+    %%amqp_channel:close(PChannel),
+    %%close_connection_pool("test_pool"),
 
     ok.

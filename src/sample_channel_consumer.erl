@@ -52,8 +52,8 @@ terminate(ChannelPid, State) ->
     ?d("sample_channel_consumer:terminate channel:~p, state:~p", [ChannelPid, State]),
     {Exchange, Bindings} = State,
     lists:foreach(fun({Queue, RoutingKey}) ->
-                          ok = fox:unbind_queue(ChannelPid, Queue, Exchange, RoutingKey),
-                          ok = fox:delete_queue(ChannelPid, Queue)
+                          fox:unbind_queue(ChannelPid, Queue, Exchange, RoutingKey),
+                          fox:delete_queue(ChannelPid, Queue)
                   end, Bindings),
-    ok = fox:delete_exchange(ChannelPid, Exchange),
+    fox:delete_exchange(ChannelPid, Exchange),
     ok.

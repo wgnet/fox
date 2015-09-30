@@ -43,20 +43,13 @@
     + вызывать sample_channel_consumer:terminate
 
 
-* 3й уровень -- сценарии использования channel
+* DONE 3й уровень -- сценарии использования channel
 
-- subscribe
-  - что если мы хотим пописаться на 2 очереди?
+* DONE Мониторинг:
 
-* Мониторинг:
+* тесты
 
-- fox_connection_worker должен мониторить channel и fox_channel_consumer
-  перезапускать их, если они упали, заново объявлять и связывать, если нужно
-
-- connection_worker после reconnect должен создать новые channel и раздать их channel_worker
-  ну и те должны заново инициализироваться
-
-- как все это протестить?
+таки надо сделать какие-нибудь
 
 
 * README
@@ -69,9 +62,15 @@
 
 - samples
 
+
 * на следующие версии:
+
 - publish with confirmation (не документарован, нужно разбираться)
   https://www.rabbitmq.com/confirms.html
+
+- fox_connection_worker должен мониторить channel и fox_channel_consumer
+  перезапускать их, если они упали, заново объявлять и связывать, если нужно
+
 
 * info
 http://www.rabbitmq.com/erlang-client-user-guide.html

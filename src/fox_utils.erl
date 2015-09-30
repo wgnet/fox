@@ -13,8 +13,9 @@
          map_to_queue_unbind/1,
          map_to_basic_publish/1,
          map_to_pbasic/1,
-         close_connection/1,
-         close_channel/1
+         close_connection/1, close_channel/1,
+         channel_call/2, channel_call/3,
+         channel_cast/2, channel_cast/3
         ]).
 
 -include("fox.hrl").
@@ -233,4 +234,33 @@ close_channel(Pid) ->
     catch
         %% channel may already be closed
         exit:{noproc, _} -> ok
+    end.
+
+
+-spec channel_call(pid(), term()) -> term().
+channel_call(ChannelPid, Method) ->
+    channel_call(ChannelPid, Method, none).
+
+
+-spec channel_call(pid(), term(), term()) -> term().
+channel_call(ChannelPid, Method, Content) ->
+    try amqp_channel:call(ChannelPid, Method, Content) of
+        {error, Reason} -> {error, Reason};
+        Reply -> Reply
+    catch
+        exit:{noproc, _} -> {error, invalid_channel}
+    end.
+
+
+-spec channel_cast(pid(), term()) -> ok | {error, term()}.
+channel_cast(ChannelPid, Method) ->
+    channel_cast(ChannelPid, Method, none).
+
+
+-spec channel_cast(pid(), term(), term()) -> ok | {error, term()}.
+channel_cast(ChannelPid, Method, Content) ->
+    try
+        amqp_channel:cast(ChannelPid, Method, Content)
+    catch
+        exit:{noproc, _} -> {error, invalid_channel}
     end.

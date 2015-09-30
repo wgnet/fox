@@ -54,7 +54,7 @@ handle_call(stop, _From, #state{channel_pid = ChannelPid,
                                 consumer_state = CState} = State) ->
     %% unsubscribe
     lists:foreach(fun(Tag) ->
-                          amqp_channel:call(ChannelPid, #'basic.cancel'{consumer_tag = Tag})
+                          fox_utils:channel_call(ChannelPid, #'basic.cancel'{consumer_tag = Tag})
                   end, Tags),
     try
         ConsumerModule:terminate(ChannelPid, CState)

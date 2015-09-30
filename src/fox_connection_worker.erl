@@ -40,8 +40,8 @@ create_channel(Pid) ->
 
 
 -spec subscribe(pid(), module(), list()) -> {ok, pid()} | {error, term()}.
-subscribe(Pid, ConsumerModule, ConsumerModuleArgs) ->
-    gen_server:call(Pid, {subscribe, ConsumerModule, ConsumerModuleArgs}).
+subscribe(Pid, ConsumerModule, ConsumerArgs) ->
+    gen_server:call(Pid, {subscribe, ConsumerModule, ConsumerArgs}).
 
 
 -spec unsubscribe(pid(), pid()) -> ok | {error, term()}.
@@ -74,26 +74,19 @@ handle_call(create_channel, _From, #state{connection = Connection} = State) ->
             end,
     {reply, Reply, State};
 
-handle_call({subscribe, ConsumerModule, ConsumerModuleArgs}, _From,
+handle_call({subscribe, ConsumerModule, ConsumerArgs}, _From,
             #state{connection = Connection, consumers = Consumers} = State) ->
     case Connection of
         undefined -> {reply, {error, no_connection}, State};
-        Pid -> case amqp_connection:open_channel(Pid) of
-                   {ok, ChannelPid} ->
-                       {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerModuleArgs),
-                       Consumers2 = maps:put(ChannelPid, ConsumerPid, Consumers),
-                       {reply, {ok, ChannelPid}, State#state{consumers = Consumers2}};
-                   {error, Reason} ->
-                       {reply, {error, Reason}, State}
-               end
+        _Pid -> {Reply, Consumers2} = subscribe_consumer(ConsumerModule, ConsumerArgs, Connection, Consumers),
+                {reply, Reply, State#state{consumers = Consumers2}}
     end;
 
 handle_call({unsubscribe, ChannelPid}, _From, #state{consumers = Consumers} = State) ->
     case maps:find(ChannelPid, Consumers) of
-        {ok, ConsumerPid} ->
-            fox_channel_consumer:stop(ConsumerPid),
+        {ok, {ConsumerPid, _, _}} ->
+            unsubscribe_consumer(ChannelPid, ConsumerPid),
             Consumers2 = maps:remove(ChannelPid, Consumers),
-            fox_utils:close_channel(ChannelPid),
             {reply, ok, State#state{consumers = Consumers2}};
         error ->
             {reply, {error, channel_not_found}, State}
@@ -135,14 +128,16 @@ handle_cast(Any, State) ->
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
 handle_info(connect, #state{connection = undefined, connection_ref = undefined,
-                            params_network = Params, reconnect_attempt = Attempt} = State) ->
+                            consumers = Consumers, params_network = Params,
+                            reconnect_attempt = Attempt} = State) ->
     case amqp_connection:start(Params) of
         {ok, Connection} ->
             Ref = erlang:monitor(process, Connection),
             error_logger:info_msg("fox_connection_worker connected to ~s",
                                   [fox_utils:params_network_to_str(Params)]),
+            Consumers2 = reinit_consumers(Connection, Consumers),
             {noreply, State#state{connection = Connection, connection_ref = Ref,
-                                  reconnect_attempt = 0}};
+                                  consumers = Consumers2, reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("fox_connection_worker could not connect to ~s ~p",
                                    [fox_utils:params_network_to_str(Params), Reason]),
@@ -174,3 +169,33 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), term(), term()) -> gs_code_change_reply().
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
+
+
+%% inner functions
+
+-spec subscribe_consumer(module(), list(), pid(), map()) -> {{ok, pid()}, map()} | {{error, term()}, map()}.
+subscribe_consumer(ConsumerModule, ConsumerArgs, Connection, Consumers) ->
+    case amqp_connection:open_channel(Connection) of
+        {ok, ChannelPid} ->
+            {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerArgs),
+            Consumers2 = maps:put(ChannelPid, {ConsumerPid, ConsumerModule, ConsumerArgs}, Consumers),
+            {{ok, ChannelPid}, Consumers2};
+        {error, Reason} ->
+            {{error, Reason}, Consumers}
+    end.
+
+
+-spec unsubscribe_consumer(pid(), pid()) -> ok.
+unsubscribe_consumer(ChannelPid, ConsumerPid) ->
+    fox_channel_consumer:stop(ConsumerPid),
+    fox_utils:close_channel(ChannelPid),
+    ok.
+
+
+-spec reinit_consumers(pid(), map()) -> ok.
+reinit_consumers(Connection, Consumers) ->
+    maps:fold(fun(ChannelPid, {ConsumerPid, ConsumerModule, ConsumerArgs}, Acc) ->
+                      unsubscribe_consumer(ChannelPid, ConsumerPid),
+                      {_, Acc2} = subscribe_consumer(ConsumerModule, ConsumerArgs, Connection, Acc),
+                      Acc2
+              end, maps:new(), Consumers).
