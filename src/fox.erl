@@ -85,6 +85,7 @@ declare_exchange(ChannelPid, Name, Params) ->
     ExchangeDeclare2 = ExchangeDeclare#'exchange.declare'{exchange = Name},
     case fox_utils:channel_call(ChannelPid, ExchangeDeclare2) of
         #'exchange.declare_ok'{} -> ok;
+        ok -> ok;
         {error, Reason} -> {error, Reason}
     end.
 
@@ -114,6 +115,7 @@ declare_queue(ChannelPid, Name, Params) ->
     QueueDeclare2 = QueueDeclare#'queue.declare'{queue = Name},
     case fox_utils:channel_call(ChannelPid, QueueDeclare2) of
         #'queue.declare_ok'{} -> ok;
+        ok -> ok;
         {error, Reason} -> {error, Reason}
     end.
 

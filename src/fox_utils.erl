@@ -239,7 +239,12 @@ close_channel(Pid) ->
 
 -spec channel_call(pid(), term()) -> term().
 channel_call(ChannelPid, Method) ->
-    channel_call(ChannelPid, Method, none).
+    try amqp_channel:call(ChannelPid, Method) of
+        {error, Reason} -> {error, Reason};
+        Reply -> Reply
+    catch
+        exit:{noproc, _} -> {error, invalid_channel}
+    end.
 
 
 -spec channel_call(pid(), term(), term()) -> term().
@@ -254,7 +259,11 @@ channel_call(ChannelPid, Method, Content) ->
 
 -spec channel_cast(pid(), term()) -> ok | {error, term()}.
 channel_cast(ChannelPid, Method) ->
-    channel_cast(ChannelPid, Method, none).
+    try
+        amqp_channel:cast(ChannelPid, Method)
+    catch
+        exit:{noproc, _} -> {error, invalid_channel}
+    end.
 
 
 -spec channel_cast(pid(), term(), term()) -> ok | {error, term()}.

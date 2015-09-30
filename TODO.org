@@ -47,27 +47,10 @@
 
 * DONE Мониторинг:
 
-* тесты
-
-** unit
-  - fox
-    - validate_params_network
-    - create_channel
-    - declare_exchange
-    - delete_exchange
-    - declare_queue
-    - delete_queue
-    - bind_queue
-    - unbind_queue
-
-** common
-  - fox_utils.erl
-    - close_connection/1,
-    - close_channel/1
-  - fox
-    - create_connection_pool
-    - close_connection_pool
-    - subscribe - publish - unsubscribe
+* common tests
+- create_connection_pool
+- close_connection_pool
+- subscribe - publish - unsubscribe
 
 
 * README
