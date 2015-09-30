@@ -50,10 +50,6 @@
 * тесты
 
 ** unit
-  - fox_connection_worker.erl
-    - get_num_channels
-    - create_channel
-    - stop
   - fox
     - validate_params_network
     - create_channel
