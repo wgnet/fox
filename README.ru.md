@@ -151,7 +151,7 @@ terminate(ChannelPid, State) ->
 ```
 
 Библиотека включает пример модуля, реализующего  **fox_channel_consumer**:
-[sample_channel_consumer](blob/master/src/sample_channel_consumer.erl)
+[sample_channel_consumer](src/sample_channel_consumer.erl)
 
 
 Вызов **fox:unsubscribe(ConnectionName, ChannelPid)** удаляет подписку,
