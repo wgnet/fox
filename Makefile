@@ -17,8 +17,9 @@ clean-all:
 	rebar clean
 	rm -f erl_crash.dump
 
-eunit:
+tests: compile
 	rebar eunit skip_deps=true
+	rebar ct
 
 run:
 	ERL_LIBS=deps erl $(ERL_RUN_ARGS)

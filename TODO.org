@@ -45,13 +45,12 @@
 
 * DONE 3й уровень -- сценарии использования channel
 
+
 * DONE Мониторинг:
 
-* common tests
-- create_connection_pool
-- close_connection_pool
-- subscribe - publish - unsubscribe
 
+* DONE common tests
+- subscribe - publish - unsubscribe
 
 * README
 

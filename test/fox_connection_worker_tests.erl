@@ -41,12 +41,15 @@ channels_test() ->
     ?assertEqual({ok, 3}, fox_connection_worker:get_num_channels(Pid)),
 
     amqp_channel:close(C1),
+    timer:sleep(100),
     ?assertEqual({ok, 2}, fox_connection_worker:get_num_channels(Pid)),
 
     amqp_channel:close(C2),
+    timer:sleep(100),
     ?assertEqual({ok, 1}, fox_connection_worker:get_num_channels(Pid)),
 
     amqp_channel:close(C3),
+    timer:sleep(100),
     ?assertEqual({ok, 0}, fox_connection_worker:get_num_channels(Pid)),
 
     ok = fox_connection_worker:stop(Pid),

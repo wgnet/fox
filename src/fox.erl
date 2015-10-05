@@ -197,7 +197,7 @@ test_run() ->
     {error, {auth_failure, _}} = validate_params_network(Params#{username => <<"Bob">>}),
 
     create_connection_pool("test_pool", Params),
-    {ok, SChannel} = subscribe("test_pool", sample_channel_consumer),
+    {ok, _SChannel} = subscribe("test_pool", sample_channel_consumer),
 
     timer:sleep(500),
 
