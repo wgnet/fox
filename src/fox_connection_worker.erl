@@ -60,7 +60,7 @@ stop(Pid) ->
 -spec init(gs_args()) -> gs_init_reply().
 init(Params) ->
     herd_rand:init_crypto(),
-    T = ets:new(monitor_subscribe_ets, [private]),
+    T = ets:new(monitor_subscribe_ets, []),
     self() ! connect,
     {ok, #state{params_network = Params, consumers = maps:new(), monitor_subscribe_ets = T}}.
 
@@ -158,6 +158,33 @@ handle_info({'DOWN', Ref, process, Connection, Reason},
     self() ! connect,
     {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
+handle_info({'DOWN', Ref, process, Pid, Reason},
+            #state{consumers = Consumers, monitor_subscribe_ets = TID} = State) ->
+    case ets:lookup(TID, Pid) of
+        [{Pid, {consumer, Pid, Ref}, {channel, ChannelPid, ChannelRef}}] ->
+            error_logger:error_msg("fox_connection_worker, consumer ~p is DOWN: ~p", [Pid, Reason]),
+            erlang:demonitor(Pid),
+            ets:delete(TID, Pid),
+            {ok, {Pid, ConsumerModule, ConsumerArgs}} = maps:find(ChannelPid, Consumers),
+            {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerArgs),
+            ConsumerRef = erlang:monitor(process, ConsumerPid),
+            ets:insert(TID, {ConsumerPid, {consumer, ConsumerPid, ConsumerRef}, {channel, ChannelPid, ChannelRef}}),
+            Consumers2 = maps:put(ChannelPid, {ConsumerPid, ConsumerModule, ConsumerArgs}, Consumers),
+            {noreply, State#state{consumers = Consumers2}};
+
+        [{Pid, {consumers, ConsumerPid, _}, {channel, Pid, Ref}}] ->
+            error_logger:error_msg("fox_connection_worker, channel ~p is DOWN: ~p", [Pid, Reason]),
+            erlang:demonitor(Pid),
+            ets:delete(TID, Pid),
+            Consumers2 = maps:remove(Pid, Consumers),
+            fox_channel_consumer:stop(ConsumerPid),
+            {noreply, State#state{consumers = Consumers2}};
+
+        [] ->
+            error_logger:error_msg("fox_connection_worker, unknow process ~p is DOWN: ~p", [Pid, Reason]),
+            {noreply, State}
+    end;
+
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
     {noreply, State}.
@@ -193,13 +220,13 @@ subscribe_consumer(ConsumerModule, ConsumerArgs, Connection, Consumers, TID) ->
 
 -spec unsubscribe_consumer(pid(), pid(), ets:tid()) -> ok.
 unsubscribe_consumer(ChannelPid, ConsumerPid, TID) ->
-    case ets:lookup(ChannelPid) of
-        [{ChannelPid}, _, {channel, ChannelPid, Ref2}] ->
+    case ets:lookup(TID, ChannelPid) of
+        [{ChannelPid, _, {channel, ChannelPid, Ref2}}] ->
             erlang:demonitor(Ref2, [flush]),
             ets:delete(TID, ChannelPid);
         [] -> error_logger:error_msg("~p:unsubscribe uknown channel ~p", [?MODULE, ChannelPid])
     end,
-    case ets:lookup(ConsumerPid) of
+    case ets:lookup(TID, ConsumerPid) of
         [{ConsumerPid, {consumer, ConsumerPid, Ref1}, _}] ->
             erlang:demonitor(Ref1, [flush]),
             ets:delete(TID, ConsumerPid);
