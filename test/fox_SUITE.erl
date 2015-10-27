@@ -11,14 +11,15 @@
 
 -export([all/0,
          init_per_suite/1, end_per_suite/1, init_per_testcase/2, end_per_testcase/2,
-         create_channel_test/1, subscribe_test/1
+         create_channel_test/1, subscribe_test/1, subscribe_state_test/1
         ]).
 
 
 -spec all() -> list().
 all() ->
     [create_channel_test,
-     subscribe_test
+     subscribe_test,
+     subscribe_state_test
     ].
 
 
@@ -107,5 +108,50 @@ subscribe_test(_Config) ->
                  Res4),
 
     amqp_channel:close(PChannel),
+    ok.
 
+
+-spec subscribe_state_test(list()) -> ok.
+subscribe_state_test(_Config) ->
+    {ok, ChannelPid} = fox:subscribe(subscribe_state_test, sample_channel_consumer),
+    ?assert(erlang:is_process_alive(ChannelPid)),
+
+    ConnectionSups = supervisor:which_children(fox_connection_pool_sup),
+    ct:pal("ConnectionSups: ~p", [ConnectionSups]),
+    ConnectionSupPid = lists:foldl(fun({{fox_connection_sup, subscribe_state_test}, SupPid, _, _}, _Acc) -> SupPid;
+                                      (_, Acc) -> Acc
+                                   end, undefined, ConnectionSups),
+    ct:pal("ConnectionSupPid: ~p", [ConnectionSupPid]),
+
+    ConnectionWorkers = supervisor:which_children(ConnectionSupPid),
+    ct:pal("ConnectionWorkers: ~p", [ConnectionWorkers]),
+    {_, ConnectionWorkerPid, _, _} = hd(lists:reverse(ConnectionWorkers)),
+    ct:pal("ConnectionWorkerPid: ~p", [ConnectionWorkerPid]),
+
+    State = sys:get_state(ConnectionWorkerPid),
+    ct:pal("State: ~p", [State]),
+    {state, _, _, _, Consumers, _, TID} = State,
+
+    EtsData = lists:sort(ets:tab2list(TID)),
+    ct:pal("EtsData: ~p", [EtsData]),
+    ?assertMatch([{ChannelPid, {consumer, _, _}, {channel, ChannelPid, _}},
+                  {_, {consumer, _, _}, {channel, ChannelPid, _}}
+                 ],
+                 EtsData),
+
+
+    [{ChannelPid, {consumer, ConsumerPid, _}, _}] = ets:lookup(TID, ChannelPid),
+    ?assertEqual({ok, {ConsumerPid, sample_channel_consumer, []}}, maps:find(ChannelPid, Consumers)),
+
+    %% Unsubscribe
+    fox:unsubscribe(subscribe_state_test, ChannelPid),
+
+    timer:sleep(200),
+    ?assert(not erlang:is_process_alive(ChannelPid)),
+
+    State2 = sys:get_state(ConnectionWorkerPid),
+    {state, _, _, _, Consumers2, _, TID} = State2,
+
+    ?assertEqual(error, maps:find(ChannelPid, Consumers2)),
+    ?assertEqual([], ets:tab2list(TID)),
     ok.
