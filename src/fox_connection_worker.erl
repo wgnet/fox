@@ -163,12 +163,13 @@ handle_info({'DOWN', Ref, process, Pid, Reason},
     case ets:lookup(TID, Pid) of
         [{Pid, {consumer, Pid, Ref}, {channel, ChannelPid, ChannelRef}}] ->
             error_logger:error_msg("fox_connection_worker, consumer ~p is DOWN: ~p", [Pid, Reason]),
-            erlang:demonitor(Pid),
+            erlang:demonitor(Ref),
             ets:delete(TID, Pid),
             {ok, {Pid, ConsumerModule, ConsumerArgs}} = maps:find(ChannelPid, Consumers),
             {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerArgs),
             ConsumerRef = erlang:monitor(process, ConsumerPid),
-            ets:insert(TID, {ConsumerPid, {consumer, ConsumerPid, ConsumerRef}, {channel, ChannelPid, ChannelRef}}),
+            ets:insert(TID, [{ConsumerPid, {consumer, ConsumerPid, ConsumerRef}, {channel, ChannelPid, ChannelRef}},
+                             {ChannelPid, {consumer, ConsumerPid, ConsumerRef}, {channel, ChannelPid, ChannelRef}}]),
             Consumers2 = maps:put(ChannelPid, {ConsumerPid, ConsumerModule, ConsumerArgs}, Consumers),
             {noreply, State#state{consumers = Consumers2}};
 

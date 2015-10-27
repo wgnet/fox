@@ -18,9 +18,10 @@
 -spec init(pid(), list()) -> {ok, #state{}} | {{subscribe, [#'basic.consume'{}]}, #state{}}.
 init(ChannelPid, Args) ->
     ct:pal("subscribe_test:init channel:~p args:~p", [ChannelPid, Args]),
-    ets:insert(subscribe_test_ets, {0, init, ChannelPid, Args}),
+    Counter = ets:info(subscribe_test_ets, size) + 1,
+    ets:insert(subscribe_test_ets, {Counter, init, ChannelPid, Args}),
 
-    State = #state{counter = 1,
+    State = #state{counter = Counter + 1,
                    exchange = <<"my_exchange">>,
                    queue = <<"my_queue">>,
                    routing_key = <<"my_key">>},
