@@ -173,13 +173,9 @@ handle_info({'DOWN', Ref, process, Pid, Reason},
             Consumers2 = maps:put(ChannelPid, {ConsumerPid, ConsumerModule, ConsumerArgs}, Consumers),
             {noreply, State#state{consumers = Consumers2}};
 
-        [{Pid, {consumers, ConsumerPid, _}, {channel, Pid, Ref}}] ->
+        [{Pid, {consumer, _, _}, {channel, Pid, Ref}}] ->
             error_logger:error_msg("fox_connection_worker, channel ~p is DOWN: ~p", [Pid, Reason]),
-            erlang:demonitor(Pid),
-            ets:delete(TID, Pid),
-            Consumers2 = maps:remove(Pid, Consumers),
-            fox_channel_consumer:stop(ConsumerPid),
-            {noreply, State#state{consumers = Consumers2}};
+            {noreply, State};
 
         [] ->
             error_logger:error_msg("fox_connection_worker, unknow process ~p is DOWN: ~p", [Pid, Reason]),

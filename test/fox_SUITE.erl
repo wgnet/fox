@@ -260,10 +260,42 @@ consumer_down_test(_Config) ->
 
 -spec channel_down_test(list()) -> ok.
 channel_down_test(_Config) ->
-    %% amqp_channel:close(ChannelPid),
+    {ok, ChannelPid} = fox:subscribe(channel_down_test, sample_channel_consumer),
+    ConnectionWorkerPid = get_connection_worker(channel_down_test),
+    State = sys:get_state(ConnectionWorkerPid),
+    ct:pal("State: ~p", [State]),
+    {state, _, _, _, Consumers, _, TID} = State,
 
-    %% - удаляется consumer pid из ets и consumer, channel pid в ets остается
-    %% - вызов unsubscribe после этого работает нормально
+    EtsData = lists:sort(ets:tab2list(TID)),
+    [{ChannelPid, {consumer, ConsumerPid, _}, _}] = ets:lookup(TID, ChannelPid),
+
+    ?assertMatch([
+                  {ChannelPid, {consumer, ConsumerPid, _}, {channel, ChannelPid, _}},
+                  {ConsumerPid, {consumer, ConsumerPid, _}, {channel, ChannelPid, _}}
+                 ],
+                 EtsData),
+    ?assertEqual({ok, {ConsumerPid, sample_channel_consumer, []}}, maps:find(ChannelPid, Consumers)),
+
+    amqp_channel:close(ChannelPid),
+    timer:sleep(200),
+
+    State2 = sys:get_state(ConnectionWorkerPid),
+    ct:pal("State2: ~p", [State2]),
+    {state, _, _, _, Consumers2, _, TID} = State2,
+
+    EtsData2 = lists:sort(ets:tab2list(TID)),
+    ?assertMatch(EtsData, EtsData2),
+    ?assertEqual(Consumers, Consumers2),
+
+    fox:unsubscribe(channel_down_test, ChannelPid),
+    timer:sleep(200),
+    ?assert(not erlang:is_process_alive(ChannelPid)),
+
+    State3 = sys:get_state(ConnectionWorkerPid),
+    {state, _, _, _, Consumers3, _, TID} = State3,
+
+    ?assertEqual(error, maps:find(ChannelPid, Consumers3)),
+    ?assertEqual([], ets:tab2list(TID)),
     ok.
 
 
