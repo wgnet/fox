@@ -37,7 +37,7 @@ get_num_channels(Pid) ->
 
 -spec create_channel(pid()) -> {ok, pid()} | {error, term()}.
 create_channel(Pid) ->
-    gen_server:call(Pid, create_channel).
+    gen_server:call(Pid, {create_channel, self()}).
 
 
 -spec subscribe(pid(), module(), list()) -> {ok, pid()} | {error, term()}.
@@ -69,10 +69,21 @@ init(Params) ->
 handle_call(get_connection, _From, #state{connection = Connection} = State) ->
     {reply, Connection, State};
 
-handle_call(create_channel, _From, #state{connection = Connection} = State) ->
+handle_call({create_channel, CallerPid}, _From,
+            #state{connection = Connection, monitor_subscribe_ets = TID} = State) ->
     Reply = case Connection of
                 undefined -> {error, no_connection};
-                Pid -> amqp_connection:open_channel(Pid)
+                ConnectionPid ->
+                    Res = amqp_connection:open_channel(ConnectionPid),
+                    case Res of
+                        {ok, ChannelPid} ->
+                            Ref1 = erlang:monitor(process, CallerPid),
+                            Ref2 = erlang:monitor(process, ChannelPid),
+                            ets:insert(TID, [{CallerPid, {caller, CallerPid, Ref1}, {channel, ChannelPid, Ref2}},
+                                             {ChannelPid, {caller, CallerPid, Ref1}, {channel, ChannelPid, Ref2}}]);
+                        _ -> do_nothing
+                    end,
+                    Res
             end,
     {reply, Reply, State};
 
@@ -95,7 +106,8 @@ handle_call({unsubscribe, ChannelPid}, _From, #state{consumers = Consumers, moni
     end;
 
 handle_call(stop, _From, #state{connection = Connection, connection_ref = Ref,
-                                params_network = Params, consumers = Consumers} = State) ->
+                                params_network = Params, consumers = Consumers,
+                                monitor_subscribe_ets = TID} = State) ->
     error_logger:info_msg("fox_connection_worker close connection ~s",
                           [fox_utils:params_network_to_str(Params)]),
     case Connection of
@@ -113,6 +125,7 @@ handle_call(stop, _From, #state{connection = Connection, connection_ref = Ref,
                 exit:{noproc, _} -> ok
             end
     end,
+    ets:delete(TID),
     {stop, normal, ok, State#state{connection = undefined,
                                    connection_ref = undefined,
                                    consumers = maps:new()}};
@@ -163,7 +176,7 @@ handle_info({'DOWN', Ref, process, Pid, Reason},
     case ets:lookup(TID, Pid) of
         [{Pid, {consumer, Pid, Ref}, {channel, ChannelPid, ChannelRef}}] ->
             error_logger:error_msg("fox_connection_worker, consumer ~p is DOWN: ~p", [Pid, Reason]),
-            erlang:demonitor(Ref),
+            erlang:demonitor(Ref, [flush]),
             ets:delete(TID, Pid),
             {ok, {Pid, ConsumerModule, ConsumerArgs}} = maps:find(ChannelPid, Consumers),
             {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerArgs),
@@ -175,6 +188,23 @@ handle_info({'DOWN', Ref, process, Pid, Reason},
 
         [{Pid, {consumer, _, _}, {channel, Pid, Ref}}] ->
             error_logger:error_msg("fox_connection_worker, channel ~p is DOWN: ~p", [Pid, Reason]),
+            {noreply, State};
+
+        [{Pid, {caller, Pid, Ref}, {channel, ChannelPid, ChannelRef}}] ->
+            error_logger:error_msg("fox_connection_worker, process ~p, owner of channel ~p is DOWN: ~p", [Pid, ChannelPid, Reason]),
+            erlang:demonitor(Ref, [flush]),
+            erlang:demonitor(ChannelRef, [flush]),
+            ets:delete(TID, Pid),
+            ets:delete(TID, ChannelPid),
+            fox_utils:close_channel(ChannelPid),
+            {noreply, State};
+
+        [{Pid, {caller, CallerPid, CallerRef}, {channel, Pid, Ref}}] ->
+            error_logger:info_msg("fox_connection_worker, channel ~p is DOWN: ~p", [Pid, Reason]),
+            erlang:demonitor(CallerRef, [flush]),
+            erlang:demonitor(Ref, [flush]),
+            ets:delete(TID, CallerPid),
+            ets:delete(TID, Pid),
             {noreply, State};
 
         [] ->

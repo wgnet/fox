@@ -5,10 +5,6 @@
 - publish with confirmation (не документарован, нужно разбираться)
   https://www.rabbitmq.com/confirms.html
 
-- fox_connection_worker должен мониторить channel и fox_channel_consumer
-  перезапускать их, если они упали, заново объявлять и связывать, если нужно
-
-
 * info
 http://www.rabbitmq.com/erlang-client-user-guide.html
 https://www.rabbitmq.com/confirms.html
