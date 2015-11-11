@@ -25,16 +25,18 @@ init(_Args) ->
     {ok, {{one_for_one, 10, 60}, []}}.
 
 
--spec start_pool(atom(), #amqp_params_network{}, integer()) -> ok.
+-spec start_pool(atom(), #amqp_params_network{}, integer()) -> ok | {error, term()}.
 start_pool(PoolName, Params, PoolSize) ->
     error_logger:info_msg("fox start pool ~p ~s of size ~p",
           [PoolName, fox_utils:params_network_to_str(Params), PoolSize]),
     ConnectionPoolSup = {{fox_connection_sup, PoolName},
-                         {fox_connection_sup, start_link, [PoolName, Params, PoolSize]},
+                         {fox_connection_sup, start_link, [Params, PoolSize]},
                          transient, 2000, supervisor,
                          [fox_connection_sup]},
-    supervisor:start_child(?MODULE, ConnectionPoolSup),
-    ok.
+    case supervisor:start_child(?MODULE, ConnectionPoolSup) of
+        {ok, _} -> ok;
+        {error, Reason} -> {error, Reason}
+    end.
 
 
 -spec stop_pool(atom()) -> ok | {error, term()}.
