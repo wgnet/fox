@@ -207,8 +207,8 @@ test_run() ->
 
     timer:sleep(1000),
 
-    %%unsubscribe("test_pool", SChannel),
-    %%amqp_channel:close(PChannel),
-    %%close_connection_pool("test_pool"),
+    %% unsubscribe("test_pool", SChannel),
+    %% amqp_channel:close(PChannel),
+    %% close_connection_pool("test_pool"),
 
     ok.

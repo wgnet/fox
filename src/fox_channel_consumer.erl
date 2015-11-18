@@ -83,22 +83,24 @@ handle_info(#'basic.consume_ok'{consumer_tag = Tag}, #state{consumer_tags = Tags
     end,
     {noreply, State};
 
-handle_info({#'basic.deliver'{consumer_tag = Tag}, #amqp_msg{}} = Data,
-            #state{channel_pid = ChannelPid, consumer = ConsumerModule,
-                   consumer_tags = Tags, consumer_state = CState} = State) ->
+handle_info({#'basic.deliver'{consumer_tag = Tag}, #amqp_msg{}} = Data, #state{consumer_tags = Tags} = State) ->
     case lists:member(Tag, Tags) of
         true ->
-            try
-                {ok, CState2} = ConsumerModule:handle(Data, ChannelPid, CState),
-                {noreply, State#state{consumer_state = CState2}}
-            catch
-                T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:handle~n~p:~p~nData:~p",
-                                              [ConsumerModule, T, E, Data]),
-                       {noreply, State}
-            end;
+            State2 = redirect_data_to_consumer(Data, State),
+            {noreply, State2};
         false -> error_logger:error_msg("~p got basic.deliver with unknown tag ~p", [?MODULE, Tag]),
                  {noreply, State}
     end;
+
+handle_info(#'basic.cancel'{consumer_tag = Tag} = Data, #state{consumer_tags = Tags} = State) ->
+    case lists:member(Tag, Tags) of
+        true ->
+            State2 = redirect_data_to_consumer(Data, State),
+            {noreply, State2};
+        false -> error_logger:error_msg("~p got basic.cancel with unknown tag ~p", [?MODULE, Tag]),
+                 {noreply, State}
+    end;
+
 
 handle_info(init, #state{channel_pid = ChannelPid,
                          consumer = ConsumerModule,
@@ -131,3 +133,18 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), term(), term()) -> gs_code_change_reply().
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
+
+
+%% inner functions
+
+redirect_data_to_consumer(Data, #state{channel_pid = ChannelPid,
+                                       consumer = ConsumerModule,
+                                       consumer_state = CState} = State) ->
+    try
+        {ok, CState2} = ConsumerModule:handle(Data, ChannelPid, CState),
+        State#state{consumer_state = CState2}
+    catch
+        T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:handle~n~p:~p~nData:~p",
+                                      [ConsumerModule, T, E, Data]),
+               State
+    end.

@@ -42,6 +42,10 @@ handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, Cha
     amqp_channel:cast(ChannelPid, #'basic.ack'{delivery_tag = Tag}),
     {ok, State};
 
+handle(#'basic.cancel'{} = Data, _ChannelPid, State) ->
+    ?d("sample_channel_consumer:handle basic.cancel, Data:~p", [Data]),
+    {ok, State};
+
 handle(Data, _ChannelPid, State) ->
     error_logger:error_msg("sample_channel_consumer:handle, unknown data:~p", [Data]),
     {ok, State}.
