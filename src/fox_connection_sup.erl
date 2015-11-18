@@ -35,7 +35,7 @@ create_channel(SupPid) ->
     end.
 
 
--spec subscribe(pid(), module(), list()) -> {ok, pid()} | {error, term()}.
+-spec subscribe(pid(), module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(SupPid, ConsumerModule, ConsumerModuleArgs) ->
     case get_less_busy_worker(SupPid) of
         {ok, Worker} -> fox_connection_worker:subscribe(Worker, ConsumerModule, ConsumerModuleArgs);

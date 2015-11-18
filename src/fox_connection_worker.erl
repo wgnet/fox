@@ -7,15 +7,27 @@
 -include("otp_types.hrl").
 -include("fox.hrl").
 -include_lib("amqp_client/include/amqp_client.hrl").
+-include_lib("stdlib/include/ms_transform.hrl").
+
+
+-record(subscription, {
+          ref :: reference(),
+          channel_pid :: pid(),
+          channel_ref :: reference(),
+          consumer_pid :: pid(),
+          consumer_ref :: reference(),
+          consumer_module :: module(),
+          consumer_args :: list()
+         }).
 
 
 -record(state, {
           connection :: pid(),
           connection_ref :: reference(),
           params_network :: #amqp_params_network{},
-          consumers :: map(),
           reconnect_attempt = 0 :: non_neg_integer(),
-          monitor_subscribe_ets :: ets:tid()
+          channels_ets :: ets:tid(),
+          subscriptions_ets :: ets:tid()
          }).
 
 
@@ -40,14 +52,14 @@ create_channel(Pid) ->
     gen_server:call(Pid, {create_channel, self()}).
 
 
--spec subscribe(pid(), module(), list()) -> {ok, pid()} | {error, term()}.
+-spec subscribe(pid(), module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(Pid, ConsumerModule, ConsumerArgs) ->
     gen_server:call(Pid, {subscribe, ConsumerModule, ConsumerArgs}).
 
 
--spec unsubscribe(pid(), pid()) -> ok | {error, term()}.
-unsubscribe(Pid, ChannelPid) ->
-    gen_server:call(Pid, {unsubscribe, ChannelPid}).
+-spec unsubscribe(pid(), reference()) -> ok | {error, term()}.
+unsubscribe(Pid, SubscribeRef) ->
+    gen_server:call(Pid, {unsubscribe, SubscribeRef}).
 
 
 -spec stop(pid()) -> ok.
@@ -60,9 +72,10 @@ stop(Pid) ->
 -spec init(gs_args()) -> gs_init_reply().
 init(Params) ->
     herd_rand:init_crypto(),
-    T = ets:new(monitor_subscribe_ets, []),
+    T1 = ets:new(channels_ets, []),
+    T2 = ets:new(subscriptions_ets, [{keypos, 2}]),
     self() ! connect,
-    {ok, #state{params_network = Params, consumers = maps:new(), monitor_subscribe_ets = T}}.
+    {ok, #state{params_network = Params, channels_ets = T1, subscriptions_ets = T2}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
@@ -70,7 +83,7 @@ handle_call(get_connection, _From, #state{connection = Connection} = State) ->
     {reply, Connection, State};
 
 handle_call({create_channel, CallerPid}, _From,
-            #state{connection = Connection, monitor_subscribe_ets = TID} = State) ->
+            #state{connection = Connection, channels_ets = TID} = State) ->
     Reply = case Connection of
                 undefined -> {error, no_connection};
                 ConnectionPid ->
@@ -88,47 +101,50 @@ handle_call({create_channel, CallerPid}, _From,
     {reply, Reply, State};
 
 handle_call({subscribe, ConsumerModule, ConsumerArgs}, _From,
-            #state{connection = Connection, consumers = Consumers, monitor_subscribe_ets = TID} = State) ->
-    case Connection of
-        undefined -> {reply, {error, no_connection}, State};
-        _Pid -> {Reply, Consumers2} = subscribe_consumer(ConsumerModule, ConsumerArgs, Connection, Consumers, TID),
-                {reply, Reply, State#state{consumers = Consumers2}}
+            #state{connection = Connection, subscriptions_ets = TID} = State) ->
+    Ref = make_ref(),
+    Sub = #subscription{ref = Ref,
+                        consumer_module = ConsumerModule,
+                        consumer_args = ConsumerArgs},
+    Reply = case Connection of
+                undefined ->
+                    ets:insert(TID, Sub),
+                    {ok, Ref};
+                _Pid ->
+                    case do_subscription(Connection, Sub) of
+                        {ok, Sub2} ->
+                            ets:insert(TID, Sub2),
+                            {ok, Ref};
+                        {error, Reason} ->
+                            {error, Reason}
+                    end
+            end,
+    {reply, Reply, State};
+
+handle_call({unsubscribe, Ref}, _From, #state{subscriptions_ets = TID} = State) ->
+    case ets:lookup(TID, Ref) of
+        [Subscription] -> close_subscription(Subscription),
+                          ets:delete(TID, Ref),
+                          {reply, ok, State};
+        [] -> {reply, {error, subscription_not_found}, State}
     end;
 
-handle_call({unsubscribe, ChannelPid}, _From, #state{consumers = Consumers, monitor_subscribe_ets = TID} = State) ->
-    case maps:find(ChannelPid, Consumers) of
-        {ok, {ConsumerPid, _, _}} ->
-            unsubscribe_consumer(ChannelPid, ConsumerPid, TID),
-            Consumers2 = maps:remove(ChannelPid, Consumers),
-            {reply, ok, State#state{consumers = Consumers2}};
-        error ->
-            {reply, {error, channel_not_found}, State}
-    end;
-
-handle_call(stop, _From, #state{connection = Connection, connection_ref = Ref,
-                                params_network = Params, consumers = Consumers,
-                                monitor_subscribe_ets = TID} = State) ->
-    error_logger:info_msg("fox_connection_worker close connection ~s",
-                          [fox_utils:params_network_to_str(Params)]),
+handle_call(stop, _From, #state{connection = Connection,
+                                connection_ref = Ref,
+                                params_network = Params,
+                                channels_ets = TID1,
+                                subscriptions_ets = TID2} = State) ->
+    error_logger:info_msg("fox_connection_worker close connection ~s", [fox_utils:params_network_to_str(Params)]),
     case Connection of
         undefined -> do_nothing;
         Pid ->
-            maps:map(fun(ChannelPid, ConsumerPid) ->
-                             fox_channel_consumer:stop(ConsumerPid),
-                             fox_utils:close_channel(ChannelPid)
-                     end, Consumers),
+            lists:foreach(fun([Sub]) -> close_subscription(Sub) end, ets:match(TID2, '$1')),
             erlang:demonitor(Ref, [flush]),
-            try
-                fox_utils:close_connection(Pid)
-            catch
-                %% connection may be already closed on server
-                exit:{noproc, _} -> ok
-            end
+            fox_utils:close_connection(Pid)
     end,
-    ets:delete(TID),
-    {stop, normal, ok, State#state{connection = undefined,
-                                   connection_ref = undefined,
-                                   consumers = maps:new()}};
+    ets:delete(TID1),
+    ets:delete(TID2),
+    {stop, normal, ok, State#state{connection = undefined, connection_ref = undefined}};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
@@ -143,16 +159,22 @@ handle_cast(Any, State) ->
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
 handle_info(connect, #state{connection = undefined, connection_ref = undefined,
-                            consumers = Consumers, params_network = Params,
-                            reconnect_attempt = Attempt, monitor_subscribe_ets = TID} = State) ->
+                            params_network = Params, reconnect_attempt = Attempt,
+                            subscriptions_ets = TID} = State) ->
     case amqp_connection:start(Params) of
         {ok, Connection} ->
             Ref = erlang:monitor(process, Connection),
             error_logger:info_msg("fox_connection_worker connected to ~s",
                                   [fox_utils:params_network_to_str(Params)]),
-            Consumers2 = reinit_consumers(Connection, Consumers, TID),
-            {noreply, State#state{connection = Connection, connection_ref = Ref,
-                                  consumers = Consumers2, reconnect_attempt = 0}};
+            NewSubs = lists:map(fun([Sub]) ->
+                                        close_subscription(Sub),
+                                        {ok, Sub2} = do_subscription(Connection, Sub),
+                                        Sub2
+                                end,
+                                ets:match(TID, '$1')),
+            ets:delete_all_objects(TID),
+            ets:insert(TID, NewSubs),
+            {noreply, State#state{connection = Connection, connection_ref = Ref, reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("fox_connection_worker could not connect to ~s ~p",
                                    [fox_utils:params_network_to_str(Params), Reason]),
@@ -172,45 +194,41 @@ handle_info({'DOWN', Ref, process, Connection, Reason},
     {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
 handle_info({'DOWN', Ref, process, Pid, Reason},
-            #state{consumers = Consumers, monitor_subscribe_ets = TID} = State) ->
-    case ets:lookup(TID, Pid) of
-        [{Pid, {consumer, Pid, Ref}, {channel, ChannelPid, ChannelRef}}] ->
-            error_logger:error_msg("fox_connection_worker, consumer ~p is DOWN: ~p", [Pid, Reason]),
-            erlang:demonitor(Ref, [flush]),
-            ets:delete(TID, Pid),
-            {ok, {Pid, ConsumerModule, ConsumerArgs}} = maps:find(ChannelPid, Consumers),
-            {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerArgs),
-            ConsumerRef = erlang:monitor(process, ConsumerPid),
-            ets:insert(TID, [{ConsumerPid, {consumer, ConsumerPid, ConsumerRef}, {channel, ChannelPid, ChannelRef}},
-                             {ChannelPid, {consumer, ConsumerPid, ConsumerRef}, {channel, ChannelPid, ChannelRef}}]),
-            Consumers2 = maps:put(ChannelPid, {ConsumerPid, ConsumerModule, ConsumerArgs}, Consumers),
-            {noreply, State#state{consumers = Consumers2}};
-
-        [{Pid, {consumer, _, _}, {channel, Pid, Ref}}] ->
-            error_logger:error_msg("fox_connection_worker, channel ~p is DOWN: ~p", [Pid, Reason]),
-            {noreply, State};
-
+            #state{connection = Connection, channels_ets = ChannelsEts, subscriptions_ets = SubsEts} = State) ->
+    case ets:lookup(ChannelsEts, Pid) of
         [{Pid, {caller, Pid, Ref}, {channel, ChannelPid, ChannelRef}}] ->
             error_logger:error_msg("fox_connection_worker, process ~p, owner of channel ~p is DOWN: ~p", [Pid, ChannelPid, Reason]),
             erlang:demonitor(Ref, [flush]),
             erlang:demonitor(ChannelRef, [flush]),
-            ets:delete(TID, Pid),
-            ets:delete(TID, ChannelPid),
-            fox_utils:close_channel(ChannelPid),
-            {noreply, State};
-
+            ets:delete(ChannelsEts, Pid),
+            ets:delete(ChannelsEts, ChannelPid),
+            fox_utils:close_channel(ChannelPid);
         [{Pid, {caller, CallerPid, CallerRef}, {channel, Pid, Ref}}] ->
             error_logger:info_msg("fox_connection_worker, channel ~p is DOWN: ~p", [Pid, Reason]),
             erlang:demonitor(CallerRef, [flush]),
             erlang:demonitor(Ref, [flush]),
-            ets:delete(TID, CallerPid),
-            ets:delete(TID, Pid),
-            {noreply, State};
+            ets:delete(ChannelsEts, CallerPid),
+            ets:delete(ChannelsEts, Pid)
+    end,
 
-        [] ->
-            error_logger:error_msg("fox_connection_worker, unknow process ~p is DOWN: ~p", [Pid, Reason]),
-            {noreply, State}
-    end;
+    MS = ets:fun2ms(fun(#subscription{channel_pid = ChPid, consumer_pid = CoPid} = Sub)
+                          when ChPid == Pid orelse CoPid == Pid ->
+                            Sub
+                    end),
+    case ets:select(SubsEts, MS) of
+        [] -> do_nothing;
+        [Sub] ->
+            error_logger:error_msg("fox_connection_worker, channel or consumer ~p is DOWN: ~p", [Pid, Reason]),
+            close_subscription(Sub),
+            case Connection of
+                undefined -> do_nothing;
+                _Pid ->
+                    {ok, Sub2} = do_subscription(Connection, Sub),
+                    ets:insert(SubsEts, Sub2)
+            end
+    end,
+    {noreply, State};
+
 
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
@@ -229,45 +247,32 @@ code_change(_OldVersion, State, _Extra) ->
 
 %% inner functions
 
--spec subscribe_consumer(module(), list(), pid(), map(), ets:tid()) -> {{ok, pid()}, map()} | {{error, term()}, map()}.
-subscribe_consumer(ConsumerModule, ConsumerArgs, Connection, Consumers, TID) ->
+-spec do_subscription(pid(), #subscription{}) -> {ok, #subscription{}} | {error, term()}.
+do_subscription(Connection, #subscription{consumer_module = ConsumerModule, consumer_args = ConsumerArgs} = Sub) ->
     case amqp_connection:open_channel(Connection) of
         {ok, ChannelPid} ->
             {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerArgs),
-            Ref1 = erlang:monitor(process, ConsumerPid),
-            Ref2 = erlang:monitor(process, ChannelPid),
-            ets:insert(TID, [{ConsumerPid, {consumer, ConsumerPid, Ref1}, {channel, ChannelPid, Ref2}},
-                             {ChannelPid,  {consumer, ConsumerPid, Ref1}, {channel, ChannelPid, Ref2}}]),
-            Consumers2 = maps:put(ChannelPid, {ConsumerPid, ConsumerModule, ConsumerArgs}, Consumers),
-            {{ok, ChannelPid}, Consumers2};
+            ChannelRef = erlang:monitor(process, ChannelPid),
+            ConsumerRef = erlang:monitor(process, ConsumerPid),
+            Sub2 = Sub#subscription{channel_pid = ChannelPid,
+                                    channel_ref = ChannelRef,
+                                    consumer_pid = ConsumerPid,
+                                    consumer_ref = ConsumerRef},
+            {ok, Sub2};
         {error, Reason} ->
-            {{error, Reason}, Consumers}
+            {error, Reason}
     end.
 
 
--spec unsubscribe_consumer(pid(), pid(), ets:tid()) -> ok.
-unsubscribe_consumer(ChannelPid, ConsumerPid, TID) ->
-    case ets:lookup(TID, ChannelPid) of
-        [{ChannelPid, _, {channel, ChannelPid, Ref2}}] ->
-            erlang:demonitor(Ref2, [flush]),
-            ets:delete(TID, ChannelPid);
-        [] -> error_logger:error_msg("~p:unsubscribe uknown channel ~p", [?MODULE, ChannelPid])
-    end,
-    case ets:lookup(TID, ConsumerPid) of
-        [{ConsumerPid, {consumer, ConsumerPid, Ref1}, _}] ->
-            erlang:demonitor(Ref1, [flush]),
-            ets:delete(TID, ConsumerPid);
-        [] -> error_logger:error_msg("~p:unsubscribe uknown consumer ~p", [?MODULE, ConsumerPid])
-    end,
+-spec close_subscription(#subscription{}) -> #subscription{}.
+close_subscription(#subscription{channel_pid = undefined, channel_ref = undefined,
+                                 consumer_pid = undefined, consumer_ref = undefined} = Sub) ->
+    Sub;
+close_subscription(#subscription{channel_pid = ChannelPid, channel_ref = ChannelRef,
+                                 consumer_pid = ConsumerPid, consumer_ref = ConsumerRef} = Sub) ->
+    erlang:demonitor(ChannelRef, [flush]),
+    erlang:demonitor(ConsumerRef, [flush]),
     fox_channel_consumer:stop(ConsumerPid),
     fox_utils:close_channel(ChannelPid),
-    ok.
-
-
--spec reinit_consumers(pid(), map(), ets:tid()) -> ok.
-reinit_consumers(Connection, Consumers, TID) ->
-    maps:fold(fun(ChannelPid, {ConsumerPid, ConsumerModule, ConsumerArgs}, Acc) ->
-                      unsubscribe_consumer(ChannelPid, ConsumerPid, TID),
-                      {_, Acc2} = subscribe_consumer(ConsumerModule, ConsumerArgs, Connection, Acc, TID),
-                      Acc2
-              end, maps:new(), Consumers).
+    Sub#subscription{channel_pid = undefined, channel_ref = undefined,
+                     consumer_pid = undefined, consumer_ref = undefined}.

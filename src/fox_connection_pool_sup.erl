@@ -62,7 +62,7 @@ create_channel(PoolName) ->
     end.
 
 
--spec subscribe(atom(), module(), list()) -> {ok, pid()} | {error, term()}.
+-spec subscribe(atom(), module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(PoolName, ConsumerModule, ConsumerModuleArgs) ->
     ChildId = {fox_connection_sup, PoolName},
     case find_child(ChildId) of

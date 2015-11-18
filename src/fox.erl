@@ -56,12 +56,12 @@ create_channel(ConnectionName) ->
     fox_connection_pool_sup:create_channel(ConnectionName2).
 
 
--spec subscribe(connection_name(), module()) -> {ok, pid()} | {error, term()}.
+-spec subscribe(connection_name(), module()) -> {ok, reference()} | {error, term()}.
 subscribe(ConnectionName, ConsumerModule) ->
     subscribe(ConnectionName, ConsumerModule, []).
 
 
--spec subscribe(connection_name(), module(), list()) -> {ok, pid()} | {error, term()}.
+-spec subscribe(connection_name(), module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(ConnectionName, ConsumerModule, ConsumerModuleArgs) ->
     true = fox_utils:validate_consumer_behaviour(ConsumerModule),
     ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
@@ -197,7 +197,7 @@ test_run() ->
     {error, {auth_failure, _}} = validate_params_network(Params#{username => <<"Bob">>}),
 
     create_connection_pool("test_pool", Params),
-    {ok, _SChannel} = subscribe("test_pool", sample_channel_consumer),
+    {ok, _Ref} = subscribe("test_pool", sample_channel_consumer),
 
     timer:sleep(500),
 
@@ -207,7 +207,7 @@ test_run() ->
 
     timer:sleep(1000),
 
-    %% unsubscribe("test_pool", SChannel),
+    %% unsubscribe("test_pool", Ref),
     %% amqp_channel:close(PChannel),
     %% close_connection_pool("test_pool"),
 
