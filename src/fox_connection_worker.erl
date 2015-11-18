@@ -208,7 +208,8 @@ handle_info({'DOWN', Ref, process, Pid, Reason},
             erlang:demonitor(CallerRef, [flush]),
             erlang:demonitor(Ref, [flush]),
             ets:delete(ChannelsEts, CallerPid),
-            ets:delete(ChannelsEts, Pid)
+            ets:delete(ChannelsEts, Pid);
+        [] -> do_nothing
     end,
 
     MS = ets:fun2ms(fun(#subscription{channel_pid = ChPid, consumer_pid = CoPid} = Sub)
@@ -272,7 +273,7 @@ close_subscription(#subscription{channel_pid = ChannelPid, channel_ref = Channel
                                  consumer_pid = ConsumerPid, consumer_ref = ConsumerRef} = Sub) ->
     erlang:demonitor(ChannelRef, [flush]),
     erlang:demonitor(ConsumerRef, [flush]),
-    fox_channel_consumer:stop(ConsumerPid),
+    fox_utils:close_consumer(ConsumerPid),
     fox_utils:close_channel(ChannelPid),
     Sub#subscription{channel_pid = undefined, channel_ref = undefined,
                      consumer_pid = undefined, consumer_ref = undefined}.

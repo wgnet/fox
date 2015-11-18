@@ -13,7 +13,7 @@
          map_to_queue_unbind/1,
          map_to_basic_publish/1,
          map_to_pbasic/1,
-         close_connection/1, close_channel/1,
+         close_connection/1, close_channel/1, close_consumer/1,
          channel_call/2, channel_call/3,
          channel_cast/2, channel_cast/3
         ]).
@@ -233,6 +233,16 @@ close_channel(Pid) ->
         amqp_channel:close(Pid), ok
     catch
         %% channel may already be closed
+        exit:{noproc, _} -> ok
+    end.
+
+
+-spec close_consumer(pid()) -> ok.
+close_consumer(Pid) ->
+    try
+        fox_channel_consumer:stop(Pid), ok
+    catch
+        %% consumer may already be closed
         exit:{noproc, _} -> ok
     end.
 

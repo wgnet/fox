@@ -13,7 +13,7 @@
          init_per_suite/1, end_per_suite/1, init_per_testcase/2, end_per_testcase/2,
          create_channel_test/1,
          subscribe_test/1, subscribe_state_test/1,
-         consumer_down_test/1, channel_down_test/1
+         consumer_down_test/1
         ]).
 
 
@@ -22,8 +22,7 @@ all() ->
     [create_channel_test,
      subscribe_test,
      subscribe_state_test,
-     consumer_down_test,
-     channel_down_test
+     consumer_down_test
     ].
 
 
@@ -70,12 +69,12 @@ subscribe_test(_Config) ->
     T = ets:new(subscribe_test_ets, [public, named_table]),
     SortF = fun(I1, I2) -> element(1, I1) < element(1, I2) end,
 
-    {ok, SChannel} = fox:subscribe(subscribe_test, subscribe_test, "some args"),
+    {ok, Ref} = fox:subscribe(subscribe_test, subscribe_test, "some args"),
 
     timer:sleep(200),
     Res1 = lists:sort(SortF, ets:tab2list(T)),
     ct:pal("Res1: ~p", [Res1]),
-    ?assertMatch([{1, init, SChannel, "some args"}], Res1),
+    ?assertMatch([{1, init, "some args"}], Res1),
 
     {ok, PChannel} = fox:create_channel(subscribe_test),
     fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
@@ -83,8 +82,8 @@ subscribe_test(_Config) ->
     Res2 = lists:sort(SortF, ets:tab2list(T)),
     ct:pal("Res2: ~p", [Res2]),
     ?assertMatch([
-                  {1, init, SChannel, "some args"},
-                  {2, handle_basic_deliver, SChannel, <<"Hi there!">>}
+                  {1, init, "some args"},
+                  {2, handle_basic_deliver, <<"Hi there!">>}
                  ],
                  Res2),
 
@@ -93,21 +92,21 @@ subscribe_test(_Config) ->
     Res3 = lists:sort(SortF, ets:tab2list(T)),
     ct:pal("Res3: ~p", [Res3]),
     ?assertMatch([
-                  {1, init, SChannel, "some args"},
-                  {2, handle_basic_deliver, SChannel, <<"Hi there!">>},
-                  {3, handle_basic_deliver, SChannel, <<"Hello!">>}
+                  {1, init, "some args"},
+                  {2, handle_basic_deliver, <<"Hi there!">>},
+                  {3, handle_basic_deliver, <<"Hello!">>}
                  ],
                  Res3),
 
-    fox:unsubscribe(subscribe_test, SChannel),
+    fox:unsubscribe(subscribe_test, Ref),
     timer:sleep(200),
     Res4 = lists:sort(SortF, ets:tab2list(T)),
     ct:pal("Res4: ~p", [Res4]),
     ?assertMatch([
-                  {1, init, SChannel, "some args"},
-                  {2, handle_basic_deliver, SChannel, <<"Hi there!">>},
-                  {3, handle_basic_deliver, SChannel, <<"Hello!">>},
-                  {4, terminate, SChannel}
+                  {1, init, "some args"},
+                  {2, handle_basic_deliver, <<"Hi there!">>},
+                  {3, handle_basic_deliver, <<"Hello!">>},
+                  {4, terminate}
                  ],
                  Res4),
 
@@ -118,35 +117,24 @@ subscribe_test(_Config) ->
 
 -spec subscribe_state_test(list()) -> ok.
 subscribe_state_test(_Config) ->
-    {ok, ChannelPid} = fox:subscribe(subscribe_state_test, sample_channel_consumer),
-    ?assert(erlang:is_process_alive(ChannelPid)),
+    {ok, Ref} = fox:subscribe(subscribe_state_test, sample_channel_consumer),
+    ct:pal("Ref:~p", [Ref]),
 
     ConnectionWorkerPid = get_connection_worker(subscribe_state_test),
     State = sys:get_state(ConnectionWorkerPid),
     ct:pal("State: ~p", [State]),
-    {state, _, _, _, Consumers, _, TID} = State,
+    {state, _, _, _, _, _, TID} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:pal("EtsData: ~p", [EtsData]),
-    ?assertMatch([{ChannelPid, {consumer, _, _}, {channel, ChannelPid, _}},
-                  {_, {consumer, _, _}, {channel, ChannelPid, _}}
-                 ],
-                 EtsData),
-
-
-    [{ChannelPid, {consumer, ConsumerPid, _}, _}] = ets:lookup(TID, ChannelPid),
-    ?assertEqual({ok, {ConsumerPid, sample_channel_consumer, []}}, maps:find(ChannelPid, Consumers)),
+    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, []}], EtsData),
+    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, []}], ets:lookup(TID, Ref)),
 
     %% Unsubscribe
-    fox:unsubscribe(subscribe_state_test, ChannelPid),
+    fox:unsubscribe(subscribe_state_test, Ref),
 
     timer:sleep(200),
-    ?assert(not erlang:is_process_alive(ChannelPid)),
 
-    State2 = sys:get_state(ConnectionWorkerPid),
-    {state, _, _, _, Consumers2, _, TID} = State2,
-
-    ?assertEqual(error, maps:find(ChannelPid, Consumers2)),
     ?assertEqual([], ets:tab2list(TID)),
     ok.
 
@@ -156,10 +144,10 @@ consumer_down_test(_Config) ->
     T = ets:new(subscribe_test_ets, [public, named_table]),
     SortF = fun(I1, I2) -> element(1, I1) < element(1, I2) end,
 
-    {ok, ChannelPid} = fox:subscribe(consumer_down_test, subscribe_test, "args2"),
+    {ok, Ref} = fox:subscribe(consumer_down_test, subscribe_test, "args2"),
     timer:sleep(200),
     Res1 = lists:sort(SortF, ets:tab2list(T)),
-    ?assertMatch([{1, init, ChannelPid, "args2"}], Res1),
+    ?assertMatch([{1, init, "args2"}], Res1),
 
     {ok, PChannel} = fox:create_channel(consumer_down_test),
     fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
@@ -167,53 +155,41 @@ consumer_down_test(_Config) ->
     Res2 = lists:sort(SortF, ets:tab2list(T)),
     ct:pal("Res2: ~p", [Res2]),
     ?assertMatch([
-                  {1, init, ChannelPid, "args2"},
-                  {2, handle_basic_deliver, ChannelPid, <<"Hi there!">>}
+                  {1, init, "args2"},
+                  {2, handle_basic_deliver, <<"Hi there!">>}
                  ],
                  Res2),
 
 
     ConnectionWorkerPid = get_connection_worker(consumer_down_test),
     State = sys:get_state(ConnectionWorkerPid),
-    ct:pal("State: ~p", [State]),
-    {state, _, _, _, Consumers, _, TID} = State,
+    {state, _, _, _, _, _, TID} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
-    [{ChannelPid, {consumer, ConsumerPid, _}, _}] = ets:lookup(TID, ChannelPid),
-
-    ?assertMatch([
-                  {ChannelPid, {consumer, ConsumerPid, _}, {channel, ChannelPid, _}},
-                  {ConsumerPid, {consumer, ConsumerPid, _}, {channel, ChannelPid, _}}
-                 ],
-                 EtsData),
-    ?assertEqual({ok, {ConsumerPid, subscribe_test, "args2"}}, maps:find(ChannelPid, Consumers)),
+    ct:pal("EtsData: ~p", [EtsData]),
+    ?assertMatch([{subscription, Ref, _, _, _, _, subscribe_test, "args2"}], EtsData),
+    [{subscription, Ref, ChannelPid, _, ConsumerPid, _, subscribe_test, "args2"}] = ets:lookup(TID, Ref),
 
     fox_channel_consumer:stop(ConsumerPid),
     timer:sleep(200),
 
-    State2 = sys:get_state(ConnectionWorkerPid),
-    {state, _, _, _, Consumers2, _, TID} = State2,
-    {ok, {ConsumerPid2, subscribe_test, "args2"}} = maps:find(ChannelPid, Consumers2),
+    [{subscription, Ref, ChannelPid2, _, ConsumerPid2, _, subscribe_test, "args2"}] = ets:lookup(TID, Ref),
+
+    ?assertNotEqual(ChannelPid, ChannelPid2),
+    ?assert(not erlang:is_process_alive(ChannelPid)),
+    ?assert(erlang:is_process_alive(ChannelPid2)),
     ?assertNotEqual(ConsumerPid, ConsumerPid2),
     ?assert(not erlang:is_process_alive(ConsumerPid)),
     ?assert(erlang:is_process_alive(ConsumerPid2)),
-
-    EtsData2 = lists:sort(ets:tab2list(TID)),
-    ?assertMatch([
-                  {ChannelPid, {consumer, ConsumerPid2, _}, {channel, ChannelPid, _}},
-                  {ConsumerPid2, {consumer, ConsumerPid2, _}, {channel, ChannelPid, _}}
-                 ],
-                 EtsData2),
-
 
     %% callback is still working
     Res3 = lists:sort(SortF, ets:tab2list(T)),
     ct:pal("Res3: ~p", [Res3]),
     ?assertMatch([
-                  {1, init, ChannelPid, "args2"},
-                  {2, handle_basic_deliver, ChannelPid, <<"Hi there!">>},
-                  {3, terminate, ChannelPid},
-                  {4, init, ChannelPid, "args2"}
+                  {1, init, "args2"},
+                  {2, handle_basic_deliver, <<"Hi there!">>},
+                  {3, terminate},
+                  {4, init, "args2"}
                  ],
                  Res3),
 
@@ -222,80 +198,36 @@ consumer_down_test(_Config) ->
     Res4 = lists:sort(SortF, ets:tab2list(T)),
     ct:pal("Res4: ~p", [Res4]),
     ?assertMatch([
-                  {1, init, ChannelPid, "args2"},
-                  {2, handle_basic_deliver, ChannelPid, <<"Hi there!">>},
-                  {3, terminate, ChannelPid},
-                  {4, init, ChannelPid, "args2"},
-                  {5, handle_basic_deliver, ChannelPid, <<"alloha">>}
+                  {1, init, "args2"},
+                  {2, handle_basic_deliver, <<"Hi there!">>},
+                  {3, terminate},
+                  {4, init, "args2"},
+                  {5, handle_basic_deliver, <<"alloha">>}
                  ],
                  Res4),
 
     %% unsubscribe
-    fox:unsubscribe(consumer_down_test, ChannelPid),
+    fox:unsubscribe(consumer_down_test, Ref),
     timer:sleep(200),
-    ?assert(not erlang:is_process_alive(ChannelPid)),
+    ?assert(not erlang:is_process_alive(ChannelPid2)),
+    ?assert(not erlang:is_process_alive(ConsumerPid2)),
 
-    State3 = sys:get_state(ConnectionWorkerPid),
-    {state, _, _, _, Consumers3, _, TID} = State3,
-
-    ?assertEqual(error, maps:find(ChannelPid, Consumers3)),
     ?assertEqual([], ets:tab2list(TID)),
 
     Res5 = lists:sort(SortF, ets:tab2list(T)),
     ct:pal("Res5: ~p", [Res5]),
     ?assertMatch([
-                  {1, init, ChannelPid, "args2"},
-                  {2, handle_basic_deliver, ChannelPid, <<"Hi there!">>},
-                  {3, terminate, ChannelPid},
-                  {4, init, ChannelPid, "args2"},
-                  {5, handle_basic_deliver, ChannelPid, <<"alloha">>},
-                  {6, terminate, ChannelPid}
+                  {1, init, "args2"},
+                  {2, handle_basic_deliver, <<"Hi there!">>},
+                  {3, terminate},
+                  {4, init, "args2"},
+                  {5, handle_basic_deliver, <<"alloha">>},
+                  {6, terminate}
                  ],
                  Res5),
 
     amqp_channel:close(PChannel),
     ets:delete(T),
-    ok.
-
-
--spec channel_down_test(list()) -> ok.
-channel_down_test(_Config) ->
-    {ok, ChannelPid} = fox:subscribe(channel_down_test, sample_channel_consumer),
-    ConnectionWorkerPid = get_connection_worker(channel_down_test),
-    State = sys:get_state(ConnectionWorkerPid),
-    ct:pal("State: ~p", [State]),
-    {state, _, _, _, Consumers, _, TID} = State,
-
-    EtsData = lists:sort(ets:tab2list(TID)),
-    [{ChannelPid, {consumer, ConsumerPid, _}, _}] = ets:lookup(TID, ChannelPid),
-
-    ?assertMatch([
-                  {ChannelPid, {consumer, ConsumerPid, _}, {channel, ChannelPid, _}},
-                  {ConsumerPid, {consumer, ConsumerPid, _}, {channel, ChannelPid, _}}
-                 ],
-                 EtsData),
-    ?assertEqual({ok, {ConsumerPid, sample_channel_consumer, []}}, maps:find(ChannelPid, Consumers)),
-
-    amqp_channel:close(ChannelPid),
-    timer:sleep(200),
-
-    State2 = sys:get_state(ConnectionWorkerPid),
-    ct:pal("State2: ~p", [State2]),
-    {state, _, _, _, Consumers2, _, TID} = State2,
-
-    EtsData2 = lists:sort(ets:tab2list(TID)),
-    ?assertMatch(EtsData, EtsData2),
-    ?assertEqual(Consumers, Consumers2),
-
-    fox:unsubscribe(channel_down_test, ChannelPid),
-    timer:sleep(200),
-    ?assert(not erlang:is_process_alive(ChannelPid)),
-
-    State3 = sys:get_state(ConnectionWorkerPid),
-    {state, _, _, _, Consumers3, _, TID} = State3,
-
-    ?assertEqual(error, maps:find(ChannelPid, Consumers3)),
-    ?assertEqual([], ets:tab2list(TID)),
     ok.
 
 
