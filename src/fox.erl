@@ -205,7 +205,7 @@ test_run() ->
     publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
     publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
 
-    timer:sleep(1000),
+    %% timer:sleep(1000),
 
     %% unsubscribe("test_pool", Ref),
     %% amqp_channel:close(PChannel),

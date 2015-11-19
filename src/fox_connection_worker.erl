@@ -1,7 +1,7 @@
 -module(fox_connection_worker).
 -behavior(gen_server).
 
--export([start_link/1, get_num_channels/1, create_channel/1, subscribe/3, unsubscribe/2, stop/1]).
+-export([start_link/1, get_info/1, create_channel/1, subscribe/3, unsubscribe/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -38,12 +38,11 @@ start_link(Params) ->
     gen_server:start_link(?MODULE, Params, []).
 
 
--spec get_num_channels(pid()) -> {ok, integer()} | {error, no_connection}.
-get_num_channels(Pid) ->
+-spec get_info(pid()) -> {num_channel, integer()} | no_connection.
+get_info(Pid) ->
     case gen_server:call(Pid, get_connection) of
-        undefined -> {error, no_connection};
-        Connection -> [{num_channels, Num}] = amqp_connection:info(Connection, [num_channels]),
-                      {ok, Num}
+        undefined -> no_connection;
+        Connection -> hd(amqp_connection:info(Connection, [num_channels]))
     end.
 
 

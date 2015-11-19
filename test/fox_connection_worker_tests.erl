@@ -29,28 +29,28 @@ start_link_test() ->
 channels_test() ->
     Params = setup(),
     {ok, Pid} = fox_connection_worker:start_link(Params),
-    ?assertEqual({ok, 0}, fox_connection_worker:get_num_channels(Pid)),
+    ?assertEqual({num_channels, 0}, fox_connection_worker:get_info(Pid)),
 
     {ok, C1} = fox_connection_worker:create_channel(Pid),
-    ?assertEqual({ok, 1}, fox_connection_worker:get_num_channels(Pid)),
+    ?assertEqual({num_channels, 1}, fox_connection_worker:get_info(Pid)),
 
     {ok, C2} = fox_connection_worker:create_channel(Pid),
-    ?assertEqual({ok, 2}, fox_connection_worker:get_num_channels(Pid)),
+    ?assertEqual({num_channels, 2}, fox_connection_worker:get_info(Pid)),
 
     {ok, C3} = fox_connection_worker:create_channel(Pid),
-    ?assertEqual({ok, 3}, fox_connection_worker:get_num_channels(Pid)),
+    ?assertEqual({num_channels, 3}, fox_connection_worker:get_info(Pid)),
 
     amqp_channel:close(C1),
     timer:sleep(100),
-    ?assertEqual({ok, 2}, fox_connection_worker:get_num_channels(Pid)),
+    ?assertEqual({num_channels, 2}, fox_connection_worker:get_info(Pid)),
 
     amqp_channel:close(C2),
     timer:sleep(100),
-    ?assertEqual({ok, 1}, fox_connection_worker:get_num_channels(Pid)),
+    ?assertEqual({num_channels, 1}, fox_connection_worker:get_info(Pid)),
 
     amqp_channel:close(C3),
     timer:sleep(100),
-    ?assertEqual({ok, 0}, fox_connection_worker:get_num_channels(Pid)),
+    ?assertEqual({num_channels, 0}, fox_connection_worker:get_info(Pid)),
 
     ok = fox_connection_worker:stop(Pid),
     ok.

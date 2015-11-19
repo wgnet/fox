@@ -29,18 +29,13 @@ init({Params, PoolSize}) ->
 
 -spec create_channel(pid()) -> {ok, pid()} | {error, term()}.
 create_channel(SupPid) ->
-    case get_less_busy_worker(SupPid) of
-        {ok, Worker} -> fox_connection_worker:create_channel(Worker);
-        {error, Reason} -> {error, Reason}
-    end.
+    fox_connection_worker:create_channel(get_less_busy_worker(SupPid)).
 
 
 -spec subscribe(pid(), module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(SupPid, ConsumerModule, ConsumerModuleArgs) ->
-    case get_less_busy_worker(SupPid) of
-        {ok, Worker} -> fox_connection_worker:subscribe(Worker, ConsumerModule, ConsumerModuleArgs);
-        {error, Reason} -> {error, Reason}
-    end.
+    Worker = get_less_busy_worker(SupPid),
+    fox_connection_worker:subscribe(Worker, ConsumerModule, ConsumerModuleArgs).
 
 
 -spec unsubscribe(pid(), pid()) -> ok | {error, term()}.
@@ -66,18 +61,13 @@ stop(SupPid) ->
 
 %% Inner functions
 
--spec get_less_busy_worker(pid()) -> {ok, pid()} | {error, no_connection}.
+-spec get_less_busy_worker(pid()) -> pid().
 get_less_busy_worker(SupPid) ->
-    Res = lists:sort(
-            lists:filtermap(
-              fun({_, ChildPid, _, _}) ->
-                      case fox_connection_worker:get_num_channels(ChildPid) of
-                          {ok, Num} -> {true, {Num, ChildPid}};
-                          {error, no_connection} -> false
-                      end
-              end,
-              supervisor:which_children(SupPid))),
-    case Res of
-        [{_, Worker} | _] -> {ok, Worker};
-        [] -> {error, no_connection}
-    end.
+    element(2, hd(lists:sort(lists:map(
+                               fun({_, ChildPid, _, _}) ->
+                                       case fox_connection_worker:get_info(ChildPid) of
+                                           {num_channels, Num} -> {Num, ChildPid};
+                                           no_connection -> {infinity, ChildPid}
+                                       end
+                               end,
+                               supervisor:which_children(SupPid))))).
