@@ -32,10 +32,10 @@ create_channel(SupPid) ->
     fox_connection_worker:create_channel(get_less_busy_worker(SupPid)).
 
 
--spec subscribe(pid(), module(), list(), list()) -> {ok, reference()} | {error, term()}.
-subscribe(SupPid, ConsumerModule, ConsumerModuleArgs, Queues) ->
+-spec subscribe(pid(), list(), module(), list()) -> {ok, reference()} | {error, term()}.
+subscribe(SupPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
     Worker = get_less_busy_worker(SupPid),
-    fox_connection_worker:subscribe(Worker, ConsumerModule, ConsumerModuleArgs, Queues).
+    fox_connection_worker:subscribe(Worker, Queues, ConsumerModule, ConsumerModuleArgs).
 
 
 -spec unsubscribe(pid(), pid()) -> ok | {error, term()}.

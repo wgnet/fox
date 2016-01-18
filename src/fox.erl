@@ -4,7 +4,7 @@
          create_connection_pool/2,
          close_connection_pool/1,
          create_channel/1,
-         subscribe/2, subscribe/3, subscribe/4, unsubscribe/2,
+         subscribe/3, subscribe/4, unsubscribe/2,
          declare_exchange/2, declare_exchange/3,
          delete_exchange/2, delete_exchange/3,
          declare_queue/2, declare_queue/3,
@@ -56,21 +56,19 @@ create_channel(ConnectionName) ->
     fox_connection_pool_sup:create_channel(ConnectionName2).
 
 
--spec subscribe(connection_name(), module()) -> {ok, reference()} | {error, term()}.
-subscribe(ConnectionName, ConsumerModule) ->
-    subscribe(ConnectionName, ConsumerModule, [], []).
+-spec subscribe(connection_name(), binary() | list(), module()) -> {ok, reference()} | {error, term()}.
+subscribe(ConnectionName, Queues, ConsumerModule) ->
+    subscribe(ConnectionName, Queues, ConsumerModule, []).
 
 
--spec subscribe(connection_name(), module(), list()) -> {ok, reference()} | {error, term()}.
-subscribe(ConnectionName, ConsumerModule, ConsumerModuleArgs) ->
-    subscribe(ConnectionName, ConsumerModule, ConsumerModuleArgs, []).
+-spec subscribe(connection_name(), binary() | list(), module(), list()) -> {ok, reference()} | {error, term()}.
+subscribe(ConnectionName, Queue, ConsumerModule, ConsumerModuleArgs) when not is_list(Queue) ->
+    subscribe(ConnectionName, [Queue], ConsumerModule, ConsumerModuleArgs);
 
-
--spec subscribe(connection_name(), module(), list(), list()) -> {ok, reference()} | {error, term()}.
-subscribe(ConnectionName, ConsumerModule, ConsumerModuleArgs, Queues) ->
+subscribe(ConnectionName, Queues, ConsumerModule, ConsumerModuleArgs) ->
     true = fox_utils:validate_consumer_behaviour(ConsumerModule),
     ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
-    fox_connection_pool_sup:subscribe(ConnectionName2, ConsumerModule, ConsumerModuleArgs, Queues).
+    fox_connection_pool_sup:subscribe(ConnectionName2, Queues, ConsumerModule, ConsumerModuleArgs).
 
 
 -spec unsubscribe(connection_name(), pid()) -> ok | {error, term()}.
@@ -202,7 +200,7 @@ test_run() ->
     {error, {auth_failure, _}} = validate_params_network(Params#{username => <<"Bob">>}),
 
     create_connection_pool("test_pool", Params),
-    {ok, _Ref} = subscribe("test_pool", sample_channel_consumer),
+    {ok, _Ref} = subscribe("test_pool", [<<"my_queue">>, <<"other_queue">>], sample_channel_consumer),
 
     timer:sleep(500),
 

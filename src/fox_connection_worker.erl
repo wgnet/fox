@@ -52,9 +52,9 @@ create_channel(Pid) ->
     gen_server:call(Pid, {create_channel, self()}).
 
 
--spec subscribe(pid(), module(), list(), list()) -> {ok, reference()} | {error, term()}.
-subscribe(Pid, ConsumerModule, ConsumerArgs, Queues) ->
-    gen_server:call(Pid, {subscribe, ConsumerModule, ConsumerArgs, Queues}).
+-spec subscribe(pid(), list(), module(), list()) -> {ok, reference()} | {error, term()}.
+subscribe(Pid, Queues, ConsumerModule, ConsumerArgs) ->
+    gen_server:call(Pid, {subscribe, Queues, ConsumerModule, ConsumerArgs}).
 
 
 -spec unsubscribe(pid(), reference()) -> ok | {error, term()}.
@@ -100,7 +100,7 @@ handle_call({create_channel, CallerPid}, _From,
             end,
     {reply, Reply, State};
 
-handle_call({subscribe, ConsumerModule, ConsumerArgs, Queues}, _From,
+handle_call({subscribe, Queues, ConsumerModule, ConsumerArgs}, _From,
             #state{connection = Connection, subscriptions_ets = TID} = State) ->
     Ref = make_ref(),
     Sub = #subscription{ref = Ref,
@@ -254,7 +254,7 @@ code_change(_OldVersion, State, _Extra) ->
 do_subscription(Connection, #subscription{consumer_module = ConsumerModule, consumer_args = ConsumerArgs, queues = Queues} = Sub) ->
     case amqp_connection:open_channel(Connection) of
         {ok, ChannelPid} ->
-            {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerArgs, Queues),
+            {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, Queues, ConsumerModule, ConsumerArgs),
             ChannelRef = erlang:monitor(process, ChannelPid),
             ConsumerRef = erlang:monitor(process, ConsumerPid),
             Sub2 = Sub#subscription{channel_pid = ChannelPid,

@@ -69,7 +69,7 @@ subscribe_test(_Config) ->
     T = ets:new(subscribe_test_ets, [public, named_table]),
     SortF = fun(I1, I2) -> element(1, I1) < element(1, I2) end,
 
-    {ok, Ref} = fox:subscribe(subscribe_test, subscribe_test, "some args", [<<"my_queue">>]),
+    {ok, Ref} = fox:subscribe(subscribe_test, <<"my_queue">>, subscribe_test, "some args"),
 
     timer:sleep(200),
     Res1 = lists:sort(SortF, ets:tab2list(T)),
@@ -117,7 +117,7 @@ subscribe_test(_Config) ->
 
 -spec subscribe_state_test(list()) -> ok.
 subscribe_state_test(_Config) ->
-    {ok, Ref} = fox:subscribe(subscribe_state_test, sample_channel_consumer, [], [<<"my_queue">>, <<"other_queue">>]),
+    {ok, Ref} = fox:subscribe(subscribe_state_test, [<<"my_queue">>, <<"other_queue">>], sample_channel_consumer, []),
 
     ct:pal("Ref:~p", [Ref]),
 
@@ -145,7 +145,7 @@ consumer_down_test(_Config) ->
     T = ets:new(subscribe_test_ets, [public, named_table]),
     SortF = fun(I1, I2) -> element(1, I1) < element(1, I2) end,
 
-    {ok, Ref} = fox:subscribe(consumer_down_test, subscribe_test, "args2", [<<"my_queue">>]),
+    {ok, Ref} = fox:subscribe(consumer_down_test,  <<"my_queue">>, subscribe_test, "args2"),
     timer:sleep(200),
     Res1 = lists:sort(SortF, ets:tab2list(T)),
     ?assertMatch([{1, init, "args2"}], Res1),

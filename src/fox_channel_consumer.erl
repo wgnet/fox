@@ -19,9 +19,9 @@
 
 %%% module API
 
--spec start_link(pid(), module(), list(), list()) -> gs_start_link_reply().
-start_link(ChannelPid, ConsumerModule, ConsumerModuleArgs, Queues) ->
-    gen_server:start_link(?MODULE, {ChannelPid, ConsumerModule, ConsumerModuleArgs, Queues}, []).
+-spec start_link(pid(), list(), module(), list()) -> gs_start_link_reply().
+start_link(ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
+    gen_server:start_link(?MODULE, {ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs}, []).
 
 
 -spec stop(pid()) -> ok.
@@ -41,7 +41,7 @@ behaviour_info(_) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init({ChannelPid, ConsumerModule, ConsumerModuleArgs, Queues}) ->
+init({ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs}) ->
     self() ! init,
     {ok, #state{channel_pid = ChannelPid, consumer = ConsumerModule,
                 consumer_tags = [],
