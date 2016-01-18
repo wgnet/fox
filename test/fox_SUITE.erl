@@ -69,7 +69,7 @@ subscribe_test(_Config) ->
     T = ets:new(subscribe_test_ets, [public, named_table]),
     SortF = fun(I1, I2) -> element(1, I1) < element(1, I2) end,
 
-    {ok, Ref} = fox:subscribe(subscribe_test, subscribe_test, "some args"),
+    {ok, Ref} = fox:subscribe(subscribe_test, subscribe_test, "some args", [<<"my_queue">>]),
 
     timer:sleep(200),
     Res1 = lists:sort(SortF, ets:tab2list(T)),
@@ -117,7 +117,8 @@ subscribe_test(_Config) ->
 
 -spec subscribe_state_test(list()) -> ok.
 subscribe_state_test(_Config) ->
-    {ok, Ref} = fox:subscribe(subscribe_state_test, sample_channel_consumer),
+    {ok, Ref} = fox:subscribe(subscribe_state_test, sample_channel_consumer, [], [<<"my_queue">>, <<"other_queue">>]),
+
     ct:pal("Ref:~p", [Ref]),
 
     ConnectionWorkerPid = get_connection_worker(subscribe_state_test),
@@ -127,8 +128,8 @@ subscribe_state_test(_Config) ->
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:pal("EtsData: ~p", [EtsData]),
-    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, []}], EtsData),
-    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, []}], ets:lookup(TID, Ref)),
+    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, [], [<<"my_queue">>, <<"other_queue">>]}], EtsData),
+    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, [], [<<"my_queue">>, <<"other_queue">>]}], ets:lookup(TID, Ref)),
 
     %% Unsubscribe
     fox:unsubscribe(subscribe_state_test, Ref),
@@ -144,7 +145,7 @@ consumer_down_test(_Config) ->
     T = ets:new(subscribe_test_ets, [public, named_table]),
     SortF = fun(I1, I2) -> element(1, I1) < element(1, I2) end,
 
-    {ok, Ref} = fox:subscribe(consumer_down_test, subscribe_test, "args2"),
+    {ok, Ref} = fox:subscribe(consumer_down_test, subscribe_test, "args2", [<<"my_queue">>]),
     timer:sleep(200),
     Res1 = lists:sort(SortF, ets:tab2list(T)),
     ?assertMatch([{1, init, "args2"}], Res1),
@@ -167,13 +168,13 @@ consumer_down_test(_Config) ->
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:pal("EtsData: ~p", [EtsData]),
-    ?assertMatch([{subscription, Ref, _, _, _, _, subscribe_test, "args2"}], EtsData),
-    [{subscription, Ref, ChannelPid, _, ConsumerPid, _, subscribe_test, "args2"}] = ets:lookup(TID, Ref),
+    ?assertMatch([{subscription, Ref, _, _, _, _, subscribe_test, "args2", [<<"my_queue">>]}], EtsData),
+    [{subscription, Ref, ChannelPid, _, ConsumerPid, _, subscribe_test, "args2", [<<"my_queue">>]}] = ets:lookup(TID, Ref),
 
     fox_channel_consumer:stop(ConsumerPid),
     timer:sleep(200),
 
-    [{subscription, Ref, ChannelPid2, _, ConsumerPid2, _, subscribe_test, "args2"}] = ets:lookup(TID, Ref),
+    [{subscription, Ref, ChannelPid2, _, ConsumerPid2, _, subscribe_test, "args2", [<<"my_queue">>]}] = ets:lookup(TID, Ref),
 
     ?assertNotEqual(ChannelPid, ChannelPid2),
     ?assert(not erlang:is_process_alive(ChannelPid)),

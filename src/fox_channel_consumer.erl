@@ -1,7 +1,7 @@
 -module(fox_channel_consumer).
 -behavior(gen_server).
 
--export([start_link/3, stop/1, behaviour_info/1]).
+-export([start_link/4, stop/1, behaviour_info/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -12,15 +12,16 @@
                 consumer :: module(),
                 consumer_args :: list(),
                 consumer_tags :: [binary()],
+                consumer_queues :: [binary()],
                 consumer_state :: term()
                }).
 
 
 %%% module API
 
--spec start_link(pid(), module(), list()) -> gs_start_link_reply().
-start_link(ChannelPid, ConsumerModule, ConsumerModuleArgs) ->
-    gen_server:start_link(?MODULE, {ChannelPid, ConsumerModule, ConsumerModuleArgs}, []).
+-spec start_link(pid(), module(), list(), list()) -> gs_start_link_reply().
+start_link(ChannelPid, ConsumerModule, ConsumerModuleArgs, Queues) ->
+    gen_server:start_link(?MODULE, {ChannelPid, ConsumerModule, ConsumerModuleArgs, Queues}, []).
 
 
 -spec stop(pid()) -> ok.
@@ -40,10 +41,11 @@ behaviour_info(_) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init({ChannelPid, ConsumerModule, ConsumerModuleArgs}) ->
+init({ChannelPid, ConsumerModule, ConsumerModuleArgs, Queues}) ->
     self() ! init,
     {ok, #state{channel_pid = ChannelPid, consumer = ConsumerModule,
                 consumer_tags = [],
+                consumer_queues = Queues,
                 consumer_args = ConsumerModuleArgs}}.
 
 
@@ -104,16 +106,17 @@ handle_info(#'basic.cancel'{consumer_tag = Tag} = Data, #state{consumer_tags = T
 
 handle_info(init, #state{channel_pid = ChannelPid,
                          consumer = ConsumerModule,
+                         consumer_queues = Queues,
                          consumer_args = ConsumerArgs} = State) ->
-    try ConsumerModule:init(ChannelPid, ConsumerArgs) of
-        {ok, CState} -> {[], CState};
-        {{subscribe, BConsumes}, CState} ->
-            Tags = lists:map(fun(BConsume) ->
-                                     #'basic.consume_ok'{consumer_tag = Tag} =
-                                         amqp_channel:subscribe(ChannelPid, BConsume, self()),
-                                     Tag
-                             end, BConsumes),
-            {noreply, State#state{consumer_tags = Tags, consumer_state = CState}}
+    try
+        {ok, CState} = ConsumerModule:init(ChannelPid, ConsumerArgs),
+        Tags = lists:map(fun(Queue) ->
+                                 BConsume = #'basic.consume'{queue = Queue},
+                                 #'basic.consume_ok'{consumer_tag = Tag} =
+                                     amqp_channel:subscribe(ChannelPid, BConsume, self()),
+                                 Tag
+                         end, Queues),
+        {noreply, State#state{consumer_tags = Tags, consumer_state = CState}}
     catch
         T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:init~n~p:~p",
                                       [ConsumerModule, T, E]),

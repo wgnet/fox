@@ -11,7 +11,7 @@
 
 %%% module API
 
--spec init(pid(), list()) -> {ok, state()} | {{subscribe, [#'basic.consume'{}]}, state()}.
+-spec init(pid(), list()) -> {ok, state()}.
 init(ChannelPid, Args) ->
     ?d("sample_channel_consumer:init channel:~p args:~p", [ChannelPid, Args]),
 
@@ -30,10 +30,7 @@ init(ChannelPid, Args) ->
     ok = fox:bind_queue(ChannelPid, Queue2, Exchange, RoutingKey2),
 
     State = {Exchange, [{Queue1, RoutingKey1}, {Queue2, RoutingKey2}]},
-
-    BC1 = #'basic.consume'{queue = Queue1},
-    BC2 = #'basic.consume'{queue = Queue2},
-    {{subscribe, [BC1, BC2]}, State}.
+    {ok, State}.
 
 
 -spec handle(term(), pid(), state()) -> {ok, state()}.

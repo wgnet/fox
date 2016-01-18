@@ -5,7 +5,7 @@
          init/1,
          start_pool/3, stop_pool/1,
          create_channel/1,
-         subscribe/3, unsubscribe/2
+         subscribe/4, unsubscribe/2
         ]).
 
 -include("otp_types.hrl").
@@ -62,12 +62,12 @@ create_channel(PoolName) ->
     end.
 
 
--spec subscribe(atom(), module(), list()) -> {ok, reference()} | {error, term()}.
-subscribe(PoolName, ConsumerModule, ConsumerModuleArgs) ->
+-spec subscribe(atom(), module(), list(), list()) -> {ok, reference()} | {error, term()}.
+subscribe(PoolName, ConsumerModule, ConsumerModuleArgs, Queues) ->
     ChildId = {fox_connection_sup, PoolName},
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} ->
-            fox_connection_sup:subscribe(ChildPid, ConsumerModule, ConsumerModuleArgs);
+            fox_connection_sup:subscribe(ChildPid, ConsumerModule, ConsumerModuleArgs, Queues);
         {error, not_found} -> {error, not_found}
     end.
 

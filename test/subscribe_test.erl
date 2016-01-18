@@ -15,7 +15,7 @@
 
 %%% module API
 
--spec init(pid(), list()) -> {ok, #state{}} | {{subscribe, [#'basic.consume'{}]}, #state{}}.
+-spec init(pid(), list()) -> {ok, #state{}}.
 init(ChannelPid, Args) ->
     ct:pal("subscribe_test:init channel:~p args:~p", [ChannelPid, Args]),
     Counter = ets:info(subscribe_test_ets, size) + 1,
@@ -29,8 +29,7 @@ init(ChannelPid, Args) ->
     ok = fox:declare_queue(ChannelPid, State#state.queue),
     ok = fox:bind_queue(ChannelPid, State#state.queue, State#state.exchange, State#state.routing_key),
 
-    BC = #'basic.consume'{queue = State#state.queue},
-    {{subscribe, [BC]}, State}.
+    {ok, State}.
 
 
 -spec handle(term(), pid(), #state{}) -> {ok, #state{}}.

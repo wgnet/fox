@@ -1,7 +1,7 @@
 -module(fox_connection_worker).
 -behavior(gen_server).
 
--export([start_link/1, get_info/1, create_channel/1, subscribe/3, unsubscribe/2, stop/1]).
+-export([start_link/1, get_info/1, create_channel/1, subscribe/4, unsubscribe/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -17,7 +17,8 @@
           consumer_pid :: pid(),
           consumer_ref :: reference(),
           consumer_module :: module(),
-          consumer_args :: list()
+          consumer_args :: list(),
+          queues :: list()
          }).
 
 
@@ -51,9 +52,9 @@ create_channel(Pid) ->
     gen_server:call(Pid, {create_channel, self()}).
 
 
--spec subscribe(pid(), module(), list()) -> {ok, reference()} | {error, term()}.
-subscribe(Pid, ConsumerModule, ConsumerArgs) ->
-    gen_server:call(Pid, {subscribe, ConsumerModule, ConsumerArgs}).
+-spec subscribe(pid(), module(), list(), list()) -> {ok, reference()} | {error, term()}.
+subscribe(Pid, ConsumerModule, ConsumerArgs, Queues) ->
+    gen_server:call(Pid, {subscribe, ConsumerModule, ConsumerArgs, Queues}).
 
 
 -spec unsubscribe(pid(), reference()) -> ok | {error, term()}.
@@ -99,12 +100,14 @@ handle_call({create_channel, CallerPid}, _From,
             end,
     {reply, Reply, State};
 
-handle_call({subscribe, ConsumerModule, ConsumerArgs}, _From,
+handle_call({subscribe, ConsumerModule, ConsumerArgs, Queues}, _From,
             #state{connection = Connection, subscriptions_ets = TID} = State) ->
     Ref = make_ref(),
     Sub = #subscription{ref = Ref,
                         consumer_module = ConsumerModule,
-                        consumer_args = ConsumerArgs},
+                        consumer_args = ConsumerArgs,
+                        queues = Queues
+                       },
     Reply = case Connection of
                 undefined ->
                     ets:insert(TID, Sub),
@@ -248,10 +251,10 @@ code_change(_OldVersion, State, _Extra) ->
 %% inner functions
 
 -spec do_subscription(pid(), #subscription{}) -> {ok, #subscription{}} | {error, term()}.
-do_subscription(Connection, #subscription{consumer_module = ConsumerModule, consumer_args = ConsumerArgs} = Sub) ->
+do_subscription(Connection, #subscription{consumer_module = ConsumerModule, consumer_args = ConsumerArgs, queues = Queues} = Sub) ->
     case amqp_connection:open_channel(Connection) of
         {ok, ChannelPid} ->
-            {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerArgs),
+            {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, ConsumerModule, ConsumerArgs, Queues),
             ChannelRef = erlang:monitor(process, ChannelPid),
             ConsumerRef = erlang:monitor(process, ConsumerPid),
             Sub2 = Sub#subscription{channel_pid = ChannelPid,

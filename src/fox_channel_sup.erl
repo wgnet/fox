@@ -1,7 +1,7 @@
 -module(fox_channel_sup).
 -behaviour(supervisor).
 
--export([start_link/0, start_worker/3, init/1]).
+-export([start_link/0, start_worker/4, init/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -12,9 +12,9 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 
--spec start_worker(pid(), module(), list()) -> {ok | pid()}.
-start_worker(ChannelPid, ConsumerModule, ConsumerModuleArgs) ->
-    supervisor:start_child(?MODULE, [ChannelPid, ConsumerModule, ConsumerModuleArgs]).
+-spec start_worker(pid(), module(), list(), list()) -> {ok | pid()}.
+start_worker(ChannelPid, ConsumerModule, ConsumerModuleArgs, Queues) ->
+    supervisor:start_child(?MODULE, [ChannelPid, ConsumerModule, ConsumerModuleArgs, Queues]).
 
 
 -spec(init(gs_args()) -> sup_init_reply()).
