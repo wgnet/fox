@@ -6,7 +6,6 @@
 
 -include("otp_types.hrl").
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
 
@@ -18,7 +17,7 @@
           consumer_ref :: reference(),
           consumer_module :: module(),
           consumer_args :: list(),
-          queues :: list()
+          queues :: [subscribe_queue()]
          }).
 
 
@@ -52,7 +51,7 @@ create_channel(Pid) ->
     gen_server:call(Pid, {create_channel, self()}).
 
 
--spec subscribe(pid(), list(), module(), list()) -> {ok, reference()} | {error, term()}.
+-spec subscribe(pid(), [subscribe_queue()], module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(Pid, Queues, ConsumerModule, ConsumerArgs) ->
     gen_server:call(Pid, {subscribe, Queues, ConsumerModule, ConsumerArgs}).
 

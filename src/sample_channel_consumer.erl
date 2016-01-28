@@ -4,7 +4,6 @@
 -export([init/2, handle/3, terminate/2]).
 
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
 
 -type(state() :: term()).
 
@@ -13,7 +12,7 @@
 
 -spec init(pid(), list()) -> {ok, state()}.
 init(ChannelPid, Args) ->
-    ?d("sample_channel_consumer:init channel:~p args:~p", [ChannelPid, Args]),
+    error_logger:info_msg("sample_channel_consumer:init channel:~p args:~p", [ChannelPid, Args]),
 
     Exchange = <<"my_exchange">>,
     Queue1 = <<"my_queue">>,
@@ -35,12 +34,12 @@ init(ChannelPid, Args) ->
 
 -spec handle(term(), pid(), state()) -> {ok, state()}.
 handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, ChannelPid, State) ->
-    ?d("sample_channel_consumer:handle basic.deliver, Payload:~p", [Payload]),
+    error_logger:info_msg("sample_channel_consumer:handle basic.deliver, Payload:~p", [Payload]),
     amqp_channel:cast(ChannelPid, #'basic.ack'{delivery_tag = Tag}),
     {ok, State};
 
 handle(#'basic.cancel'{} = Data, _ChannelPid, State) ->
-    ?d("sample_channel_consumer:handle basic.cancel, Data:~p", [Data]),
+    error_logger:info_msg("sample_channel_consumer:handle basic.cancel, Data:~p", [Data]),
     {ok, State};
 
 handle(Data, _ChannelPid, State) ->
@@ -50,7 +49,7 @@ handle(Data, _ChannelPid, State) ->
 
 -spec terminate(pid(), state()) -> ok.
 terminate(ChannelPid, State) ->
-    ?d("sample_channel_consumer:terminate channel:~p, state:~p", [ChannelPid, State]),
+    error_logger:info_msg("sample_channel_consumer:terminate channel:~p, state:~p", [ChannelPid, State]),
     {Exchange, Bindings} = State,
     lists:foreach(fun({Queue, RoutingKey}) ->
                           fox:unbind_queue(ChannelPid, Queue, Exchange, RoutingKey),

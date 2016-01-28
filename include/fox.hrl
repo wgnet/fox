@@ -1,4 +1,5 @@
--type(connection_name() :: binary() | string() | atom()).
+-include_lib("amqp_client/include/amqp_client.hrl").
 
--define(d(Str), error_logger:info_msg(Str)).
--define(d(Format, Params), error_logger:info_msg(Format, Params)).
+-type(connection_name() :: binary() | string() | atom()).
+-type(queue_name() :: binary()).
+-type(subscribe_queue() :: queue_name() | #'basic.consume'{}).

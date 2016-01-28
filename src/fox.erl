@@ -15,7 +15,6 @@
          test_run/0]).
 
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
 
 
 %%% module API
@@ -56,12 +55,14 @@ create_channel(ConnectionName) ->
     fox_connection_pool_sup:create_channel(ConnectionName2).
 
 
--spec subscribe(connection_name(), binary() | list(), module()) -> {ok, reference()} | {error, term()}.
+-spec subscribe(connection_name(), subscribe_queue() | [subscribe_queue()], module()) ->
+                       {ok, reference()} | {error, term()}.
 subscribe(ConnectionName, Queues, ConsumerModule) ->
     subscribe(ConnectionName, Queues, ConsumerModule, []).
 
 
--spec subscribe(connection_name(), binary() | list(), module(), list()) -> {ok, reference()} | {error, term()}.
+-spec subscribe(connection_name(), subscribe_queue() | [subscribe_queue()], module(), list()) ->
+                       {ok, reference()} | {error, term()}.
 subscribe(ConnectionName, Queue, ConsumerModule, ConsumerModuleArgs) when not is_list(Queue) ->
     subscribe(ConnectionName, [Queue], ConsumerModule, ConsumerModuleArgs);
 
@@ -200,7 +201,10 @@ test_run() ->
     {error, {auth_failure, _}} = validate_params_network(Params#{username => <<"Bob">>}),
 
     create_connection_pool("test_pool", Params),
-    {ok, _Ref} = subscribe("test_pool", [<<"my_queue">>, <<"other_queue">>], sample_channel_consumer),
+
+    Q1 = #'basic.consume'{queue = <<"my_queue">>},
+    Q2 = <<"other_queue">>,
+    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_channel_consumer),
 
     timer:sleep(500),
 

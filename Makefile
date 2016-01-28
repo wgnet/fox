@@ -12,6 +12,7 @@ get-deps:
 clean:
 	rebar clean skip_deps=true
 	rm -f erl_crash.dump
+	rm test/*.beam
 
 clean-all:
 	rebar clean

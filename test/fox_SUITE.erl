@@ -3,7 +3,6 @@
 %% test needs connection to RabbitMQ
 
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -73,14 +72,14 @@ subscribe_test(_Config) ->
 
     timer:sleep(200),
     Res1 = lists:sort(SortF, ets:tab2list(T)),
-    ct:pal("Res1: ~p", [Res1]),
+    ct:log("Res1: ~p", [Res1]),
     ?assertMatch([{1, init, "some args"}], Res1),
 
     {ok, PChannel} = fox:create_channel(subscribe_test),
     fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
     timer:sleep(200),
     Res2 = lists:sort(SortF, ets:tab2list(T)),
-    ct:pal("Res2: ~p", [Res2]),
+    ct:log("Res2: ~p", [Res2]),
     ?assertMatch([
                   {1, init, "some args"},
                   {2, handle_basic_deliver, <<"Hi there!">>}
@@ -90,7 +89,7 @@ subscribe_test(_Config) ->
     fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hello!">>),
     timer:sleep(200),
     Res3 = lists:sort(SortF, ets:tab2list(T)),
-    ct:pal("Res3: ~p", [Res3]),
+    ct:log("Res3: ~p", [Res3]),
     ?assertMatch([
                   {1, init, "some args"},
                   {2, handle_basic_deliver, <<"Hi there!">>},
@@ -101,7 +100,7 @@ subscribe_test(_Config) ->
     fox:unsubscribe(subscribe_test, Ref),
     timer:sleep(200),
     Res4 = lists:sort(SortF, ets:tab2list(T)),
-    ct:pal("Res4: ~p", [Res4]),
+    ct:log("Res4: ~p", [Res4]),
     ?assertMatch([
                   {1, init, "some args"},
                   {2, handle_basic_deliver, <<"Hi there!">>},
@@ -117,19 +116,22 @@ subscribe_test(_Config) ->
 
 -spec subscribe_state_test(list()) -> ok.
 subscribe_state_test(_Config) ->
-    {ok, Ref} = fox:subscribe(subscribe_state_test, [<<"my_queue">>, <<"other_queue">>], sample_channel_consumer, []),
+    {ok, Ref} = fox:subscribe(subscribe_state_test,
+                              [<<"my_queue">>,
+                               #'basic.consume'{queue = <<"other_queue">>}],
+                              sample_channel_consumer, []),
 
-    ct:pal("Ref:~p", [Ref]),
+    ct:log("Ref:~p", [Ref]),
 
     ConnectionWorkerPid = get_connection_worker(subscribe_state_test),
     State = sys:get_state(ConnectionWorkerPid),
-    ct:pal("State: ~p", [State]),
+    ct:log("State: ~p", [State]),
     {state, _, _, _, _, _, TID} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
-    ct:pal("EtsData: ~p", [EtsData]),
-    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, [], [<<"my_queue">>, <<"other_queue">>]}], EtsData),
-    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, [], [<<"my_queue">>, <<"other_queue">>]}], ets:lookup(TID, Ref)),
+    ct:log("EtsData: ~p", [EtsData]),
+    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, [], _}], EtsData),
+    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, [], _}], ets:lookup(TID, Ref)),
 
     %% Unsubscribe
     fox:unsubscribe(subscribe_state_test, Ref),
@@ -154,7 +156,7 @@ consumer_down_test(_Config) ->
     fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
     timer:sleep(200),
     Res2 = lists:sort(SortF, ets:tab2list(T)),
-    ct:pal("Res2: ~p", [Res2]),
+    ct:log("Res2: ~p", [Res2]),
     ?assertMatch([
                   {1, init, "args2"},
                   {2, handle_basic_deliver, <<"Hi there!">>}
@@ -167,7 +169,7 @@ consumer_down_test(_Config) ->
     {state, _, _, _, _, _, TID} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
-    ct:pal("EtsData: ~p", [EtsData]),
+    ct:log("EtsData: ~p", [EtsData]),
     ?assertMatch([{subscription, Ref, _, _, _, _, subscribe_test, "args2", [<<"my_queue">>]}], EtsData),
     [{subscription, Ref, ChannelPid, _, ConsumerPid, _, subscribe_test, "args2", [<<"my_queue">>]}] = ets:lookup(TID, Ref),
 
@@ -185,7 +187,7 @@ consumer_down_test(_Config) ->
 
     %% callback is still working
     Res3 = lists:sort(SortF, ets:tab2list(T)),
-    ct:pal("Res3: ~p", [Res3]),
+    ct:log("Res3: ~p", [Res3]),
     ?assertMatch([
                   {1, init, "args2"},
                   {2, handle_basic_deliver, <<"Hi there!">>},
@@ -197,7 +199,7 @@ consumer_down_test(_Config) ->
     fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"alloha">>),
     timer:sleep(200),
     Res4 = lists:sort(SortF, ets:tab2list(T)),
-    ct:pal("Res4: ~p", [Res4]),
+    ct:log("Res4: ~p", [Res4]),
     ?assertMatch([
                   {1, init, "args2"},
                   {2, handle_basic_deliver, <<"Hi there!">>},
@@ -216,7 +218,7 @@ consumer_down_test(_Config) ->
     ?assertEqual([], ets:tab2list(TID)),
 
     Res5 = lists:sort(SortF, ets:tab2list(T)),
-    ct:pal("Res5: ~p", [Res5]),
+    ct:log("Res5: ~p", [Res5]),
     ?assertMatch([
                   {1, init, "args2"},
                   {2, handle_basic_deliver, <<"Hi there!">>},

@@ -5,7 +5,6 @@
 
 -include("otp_types.hrl").
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
 
 
 %% Module API
@@ -32,7 +31,7 @@ create_channel(SupPid) ->
     fox_connection_worker:create_channel(get_less_busy_worker(SupPid)).
 
 
--spec subscribe(pid(), list(), module(), list()) -> {ok, reference()} | {error, term()}.
+-spec subscribe(pid(), [subscribe_queue()], module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(SupPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
     Worker = get_less_busy_worker(SupPid),
     fox_connection_worker:subscribe(Worker, Queues, ConsumerModule, ConsumerModuleArgs).

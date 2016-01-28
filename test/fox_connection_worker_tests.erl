@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
+
 
 setup() ->
     application:ensure_all_started(amqp_client),

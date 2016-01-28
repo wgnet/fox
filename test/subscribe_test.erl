@@ -4,7 +4,6 @@
 -export([init/2, handle/3, terminate/2]).
 
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
 
 -record(state, {counter = 0 :: integer(),
                 exchange :: binary(),
@@ -17,7 +16,7 @@
 
 -spec init(pid(), list()) -> {ok, #state{}}.
 init(ChannelPid, Args) ->
-    ct:pal("subscribe_test:init channel:~p args:~p", [ChannelPid, Args]),
+    ct:log("subscribe_test:init channel:~p args:~p", [ChannelPid, Args]),
     Counter = ets:info(subscribe_test_ets, size) + 1,
     ets:insert(subscribe_test_ets, {Counter, init, Args}),
 
@@ -34,7 +33,7 @@ init(ChannelPid, Args) ->
 
 -spec handle(term(), pid(), #state{}) -> {ok, #state{}}.
 handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, ChannelPid, #state{counter = Counter} = State) ->
-    ct:pal("subscribe_test:handle basic.deliver, Payload:~p", [Payload]),
+    ct:log("subscribe_test:handle basic.deliver, Payload:~p", [Payload]),
     ets:insert(subscribe_test_ets, {Counter, handle_basic_deliver, Payload}),
     amqp_channel:cast(ChannelPid, #'basic.ack'{delivery_tag = Tag}),
     {ok, State#state{counter = Counter + 1}};
@@ -46,7 +45,7 @@ handle(Data, _ChannelPid, State) ->
 
 -spec terminate(pid(), #state{}) -> ok.
 terminate(ChannelPid, #state{counter = Counter, exchange = Exchange, queue = Queue, routing_key = RoutingKey}) ->
-    ?d("subscribe_test:terminate channel:~p", [ChannelPid]),
+    ct:log("subscribe_test:terminate channel:~p", [ChannelPid]),
     ets:insert(subscribe_test_ets, {Counter, terminate}),
     fox:unbind_queue(ChannelPid, Queue, Exchange, RoutingKey),
     fox:delete_queue(ChannelPid, Queue),

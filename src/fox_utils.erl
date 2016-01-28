@@ -19,7 +19,6 @@
         ]).
 
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
 
 
 %%% module API

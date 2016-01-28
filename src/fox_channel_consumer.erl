@@ -6,20 +6,19 @@
 
 -include("otp_types.hrl").
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
 
 -record(state, {channel_pid :: pid(),
                 consumer :: module(),
                 consumer_args :: list(),
                 consumer_tags :: [binary()],
-                consumer_queues :: [binary()],
+                consumer_queues :: [subscribe_queue()],
                 consumer_state :: term()
                }).
 
 
 %%% module API
 
--spec start_link(pid(), list(), module(), list()) -> gs_start_link_reply().
+-spec start_link(pid(), [subscribe_queue()], module(), list()) -> gs_start_link_reply().
 start_link(ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
     gen_server:start_link(?MODULE, {ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs}, []).
 
@@ -110,8 +109,11 @@ handle_info(init, #state{channel_pid = ChannelPid,
                          consumer_args = ConsumerArgs} = State) ->
     try
         {ok, CState} = ConsumerModule:init(ChannelPid, ConsumerArgs),
-        Tags = lists:map(fun(Queue) ->
-                                 BConsume = #'basic.consume'{queue = Queue},
+        Tags = lists:map(fun(Queue) -> % Queue is binary() or #'basic.consume{}
+                                 BConsume = if
+                                                is_binary(Queue) -> #'basic.consume'{queue = Queue};
+                                                true -> Queue
+                                            end,
                                  #'basic.consume_ok'{consumer_tag = Tag} =
                                      amqp_channel:subscribe(ChannelPid, BConsume, self()),
                                  Tag

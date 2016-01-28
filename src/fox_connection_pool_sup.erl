@@ -10,7 +10,6 @@
 
 -include("otp_types.hrl").
 -include("fox.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
 
 
 %% Module API
@@ -62,7 +61,7 @@ create_channel(PoolName) ->
     end.
 
 
--spec subscribe(atom(), list(), module(), list()) -> {ok, reference()} | {error, term()}.
+-spec subscribe(atom(), [subscribe_queue()], module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(PoolName, Queues, ConsumerModule, ConsumerModuleArgs) ->
     ChildId = {fox_connection_sup, PoolName},
     case find_child(ChildId) of
