@@ -60,8 +60,8 @@ handle_call(stop, _From, #state{channel_pid = ChannelPid,
     try
         ConsumerModule:terminate(ChannelPid, CState)
     catch
-        T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:terminate~n~p:~p",
-                                      [ConsumerModule, T, E])
+        T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:terminate~n~p:~p~nstacktrace: ~p",
+                                      [ConsumerModule, T, E, erlang:get_stacktrace()])
     end,
     {stop, normal, ok, State};
 
@@ -120,8 +120,8 @@ handle_info(init, #state{channel_pid = ChannelPid,
                          end, Queues),
         {noreply, State#state{consumer_tags = Tags, consumer_state = CState}}
     catch
-        T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:init~n~p:~p",
-                                      [ConsumerModule, T, E]),
+        T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:init~n~p:~p~nstacktrace: ~p",
+                                      [ConsumerModule, T, E, erlang:get_stacktrace()]),
                {noreply, State}
     end;
 
@@ -149,7 +149,7 @@ redirect_data_to_consumer(Data, #state{channel_pid = ChannelPid,
         {ok, CState2} = ConsumerModule:handle(Data, ChannelPid, CState),
         State#state{consumer_state = CState2}
     catch
-        T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:handle~n~p:~p~nData:~p",
-                                      [ConsumerModule, T, E, Data]),
+        T:E -> error_logger:error_msg("fox_channel_consumer error in ~p:handle~n~p:~p~nData:~p~nstacktrace: ~p",
+                                      [ConsumerModule, T, E, Data, erlang:get_stacktrace()]),
                State
     end.
