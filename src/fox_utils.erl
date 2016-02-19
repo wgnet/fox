@@ -221,8 +221,8 @@ close_connection(Pid) ->
     try
         amqp_connection:close(Pid), ok
     catch
-        %% connection may already be closed
-        exit:{noproc, _} -> ok
+        exit:{noproc, _} -> ok; % connection may already be closed
+        E:R -> error_logger:error_msg("can't close connection~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
     end.
 
 
@@ -231,8 +231,8 @@ close_channel(Pid) ->
     try
         amqp_channel:close(Pid), ok
     catch
-        %% channel may already be closed
-        exit:{noproc, _} -> ok
+        exit:{noproc, _} -> ok; % channel may already be closed
+        E:R -> error_logger:error_msg("can't close channel~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
     end.
 
 
@@ -241,8 +241,8 @@ close_consumer(Pid) ->
     try
         fox_channel_consumer:stop(Pid), ok
     catch
-        %% consumer may already be closed
-        exit:{noproc, _} -> ok
+        exit:{noproc, _} -> ok; % consumer may already be closed
+        E:R -> error_logger:error_msg("can't close consumer~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
     end.
 
 

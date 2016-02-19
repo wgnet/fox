@@ -179,7 +179,7 @@ publish(ChannelPid, Exchange, RoutingKey, Payload) ->
 
 
 -spec publish(pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
-publish(ChannelPid, Exchange, RoutingKey, Payload, Params) ->
+publish(ChannelPid, Exchange, RoutingKey, Payload, Params) when is_binary(Payload) ->
     Publish = fox_utils:map_to_basic_publish(Params),
     Publish2 = Publish#'basic.publish'{exchange = Exchange, routing_key = RoutingKey},
     PBasic = fox_utils:map_to_pbasic(Params),

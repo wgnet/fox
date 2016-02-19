@@ -225,8 +225,12 @@ handle_info({'DOWN', Ref, process, Pid, Reason},
             case Connection of
                 undefined -> do_nothing;
                 _Pid ->
-                    {ok, Sub2} = do_subscription(Connection, Sub),
-                    ets:insert(SubsEts, Sub2)
+                    try
+                        {ok, Sub2} = do_subscription(Connection, Sub),
+                        ets:insert(SubsEts, Sub2)
+                    catch
+                        E:R -> error_logger:error_msg("do_subscription~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
+                    end
             end
     end,
     {noreply, State};
@@ -251,8 +255,10 @@ code_change(_OldVersion, State, _Extra) ->
 
 -spec do_subscription(pid(), #subscription{}) -> {ok, #subscription{}} | {error, term()}.
 do_subscription(Connection, #subscription{consumer_module = ConsumerModule, consumer_args = ConsumerArgs, queues = Queues} = Sub) ->
+    error_logger:info_msg("open channel in connection ~p", [Connection]),
     case amqp_connection:open_channel(Connection) of
         {ok, ChannelPid} ->
+            error_logger:info_msg("channel opened"),
             {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, Queues, ConsumerModule, ConsumerArgs),
             ChannelRef = erlang:monitor(process, ChannelPid),
             ConsumerRef = erlang:monitor(process, ConsumerPid),
