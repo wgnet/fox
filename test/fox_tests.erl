@@ -34,6 +34,19 @@ create_channel_test() ->
     ok.
 
 
+channels_limit_test() ->
+    Params = setup(),
+    application:set_env(fox, connection_pool_size, 1),
+    application:set_env(fox, max_channels_per_connection, 2),
+    fox:create_connection_pool("pool_1", Params),
+    ?assertMatch({ok, _}, fox:create_channel("pool_1")),
+    ?assertMatch({ok, _}, fox:create_channel("pool_1")),
+    ?assertEqual({error, channels_limit_exceeded}, fox:create_channel("pool_1")),
+    application:set_env(fox, connection_pool_size, 5),
+    application:set_env(fox, max_channels_per_connection, 100),
+    ok.
+
+
 declare_exchange_test() ->
     Params = setup(),
     fox:create_connection_pool("pool_2", Params),

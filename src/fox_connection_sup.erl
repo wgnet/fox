@@ -28,13 +28,19 @@ init({Params, PoolSize}) ->
 
 -spec create_channel(pid()) -> {ok, pid()} | {error, term()}.
 create_channel(SupPid) ->
-    fox_connection_worker:create_channel(get_less_busy_worker(SupPid)).
+    case get_less_busy_worker(SupPid) of
+        {ok, Worker} -> fox_connection_worker:create_channel(Worker);
+        {error, Reason} -> {error, Reason}
+    end.
 
 
 -spec subscribe(pid(), [subscribe_queue()], module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(SupPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
-    Worker = get_less_busy_worker(SupPid),
-    fox_connection_worker:subscribe(Worker, Queues, ConsumerModule, ConsumerModuleArgs).
+    case get_less_busy_worker(SupPid) of
+    {ok, Worker} ->
+            fox_connection_worker:subscribe(Worker, Queues, ConsumerModule, ConsumerModuleArgs);
+        {error, Reason} -> {error, Reason}
+    end.
 
 
 -spec unsubscribe(pid(), pid()) -> ok | {error, term()}.
@@ -62,11 +68,18 @@ stop(SupPid) ->
 
 -spec get_less_busy_worker(pid()) -> pid().
 get_less_busy_worker(SupPid) ->
-    element(2, hd(lists:sort(lists:map(
-                               fun({_, ChildPid, _, _}) ->
-                                       case fox_connection_worker:get_info(ChildPid) of
-                                           {num_channels, Num} -> {Num, ChildPid};
-                                           no_connection -> {infinity, ChildPid}
-                                       end
-                               end,
-                               supervisor:which_children(SupPid))))).
+    {ok, MaxChannels} = application:get_env(fox, max_channels_per_connection),
+    {NumChannels, Pid} = hd(lists:sort(
+                              lists:map(
+                                fun({_, ChildPid, _, _}) ->
+                                        case fox_connection_worker:get_info(ChildPid) of
+                                            {num_channels, Num} -> {Num, ChildPid};
+                                            no_connection -> {infinity, ChildPid}
+                                        end
+                                end,
+                                supervisor:which_children(SupPid)))),
+    if
+        NumChannels == infinity -> {error, no_connection};
+        NumChannels < MaxChannels -> {ok, Pid};
+        true -> {error, channels_limit_exceeded}
+    end.

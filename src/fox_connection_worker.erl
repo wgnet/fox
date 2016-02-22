@@ -255,10 +255,8 @@ code_change(_OldVersion, State, _Extra) ->
 
 -spec do_subscription(pid(), #subscription{}) -> {ok, #subscription{}} | {error, term()}.
 do_subscription(Connection, #subscription{consumer_module = ConsumerModule, consumer_args = ConsumerArgs, queues = Queues} = Sub) ->
-    error_logger:info_msg("open channel in connection ~p", [Connection]),
     case amqp_connection:open_channel(Connection) of
         {ok, ChannelPid} ->
-            error_logger:info_msg("channel opened"),
             {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, Queues, ConsumerModule, ConsumerArgs),
             ChannelRef = erlang:monitor(process, ChannelPid),
             ConsumerRef = erlang:monitor(process, ConsumerPid),
