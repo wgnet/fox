@@ -108,18 +108,18 @@ delete_exchange(ChannelPid, Name, Params) ->
     end.
 
 
--spec declare_queue(pid(), binary()) -> ok | {error, term()}.
+-spec declare_queue(pid(), binary()) -> ok | #'queue.declare_ok'{} | {error, term()}.
 declare_queue(ChannelPid, Name) when is_binary(Name) ->
     declare_queue(ChannelPid, Name, maps:new()).
 
 
--spec declare_queue(pid(), binary(), map()) -> ok | {error, term()}.
+-spec declare_queue(pid(), binary(), map()) -> ok | #'queue.declare_ok'{} | {error, term()}.
 declare_queue(ChannelPid, Name, Params) ->
     QueueDeclare = fox_utils:map_to_queue_declare(Params),
     QueueDeclare2 = QueueDeclare#'queue.declare'{queue = Name},
     case fox_utils:channel_call(ChannelPid, QueueDeclare2) of
-        #'queue.declare_ok'{} -> ok;
         ok -> ok;
+        #'queue.declare_ok'{} = Reply -> Reply;
         {error, Reason} -> {error, Reason}
     end.
 

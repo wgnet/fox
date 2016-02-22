@@ -25,7 +25,7 @@ init(ChannelPid, Args) ->
                    queue = <<"my_queue">>,
                    routing_key = <<"my_key">>},
     ok = fox:declare_exchange(ChannelPid, State#state.exchange),
-    ok = fox:declare_queue(ChannelPid, State#state.queue),
+    #'queue.declare_ok'{} = fox:declare_queue(ChannelPid, State#state.queue),
     ok = fox:bind_queue(ChannelPid, State#state.queue, State#state.exchange, State#state.routing_key),
 
     {ok, State}.

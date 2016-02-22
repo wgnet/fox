@@ -6,7 +6,7 @@
 
 
 setup() ->
-    application:ensure_all_started(amqp_client),
+    application:ensure_all_started(fox),
     fox_utils:map_to_params_network(#{host => "localhost",
                                       port => 5672,
                                       virtual_host => <<"/">>,
