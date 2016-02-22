@@ -66,9 +66,9 @@ declare_queue_test() ->
     {ok, Channel} = fox:create_channel("pool_3"),
     ?assertMatch(#'queue.declare_ok'{queue = <<"my_queue">>}, fox:declare_queue(Channel, <<"my_queue">>)),
     ?assertEqual(ok, fox:declare_queue(Channel, <<"other_queue">>, #{nowait => true})),
-    ?assertMatch(ok, fox:delete_queue(Channel, <<"my_queue">>)),
-    ?assertMatch(ok, fox:delete_queue(Channel, <<"other_queue">>)),
-    ?assertMatch(ok, amqp_channel:close(Channel)),
+    ?assertMatch(#'queue.delete_ok'{}, fox:delete_queue(Channel, <<"my_queue">>)),
+    ?assertMatch(#'queue.delete_ok'{}, fox:delete_queue(Channel, <<"other_queue">>)),
+    ?assertEqual(ok, amqp_channel:close(Channel)),
     fox:close_connection_pool("pool_3"),
     ok.
 
@@ -83,7 +83,7 @@ bind_queue_test() ->
     ?assertEqual(ok, fox:bind_queue(Channel, <<"my_queue">>, <<"my_exchange">>, <<"my_key">>)),
 
     ?assertEqual(ok, fox:unbind_queue(Channel, <<"my_queue">>, <<"my_exchange">>, <<"my_key">>)),
-    ?assertEqual(ok, fox:delete_queue(Channel, <<"my_queue">>)),
+    ?assertMatch(#'queue.delete_ok'{}, fox:delete_queue(Channel, <<"my_queue">>)),
     ?assertEqual(ok, fox:delete_exchange(Channel, <<"my_exchange">>)),
 
     ?assertEqual(ok, amqp_channel:close(Channel)),

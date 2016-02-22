@@ -124,17 +124,17 @@ declare_queue(ChannelPid, Name, Params) ->
     end.
 
 
--spec delete_queue(pid(), binary()) -> ok | {error, term()}.
+-spec delete_queue(pid(), binary()) -> #'queue.delete_ok'{} | {error, term()}.
 delete_queue(ChannelPid, Name) when is_binary(Name) ->
     delete_queue(ChannelPid, Name, maps:new()).
 
 
--spec delete_queue(pid(), binary(), map()) -> ok | {error, term()}.
+-spec delete_queue(pid(), binary(), map()) -> #'queue.delete_ok'{} | {error, term()}.
 delete_queue(ChannelPid, Name, Params) ->
     QueueDelete = fox_utils:map_to_queue_delete(Params),
     QueueDelete2 = QueueDelete#'queue.delete'{queue = Name},
     case fox_utils:channel_call(ChannelPid, QueueDelete2) of
-        #'queue.delete_ok'{} -> ok;
+        #'queue.delete_ok'{} = Reply -> Reply;
         {error, Reason} -> {error, Reason}
     end.
 
