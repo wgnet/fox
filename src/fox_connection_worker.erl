@@ -190,7 +190,9 @@ handle_info(connect, #state{connection = undefined, connection_ref = undefined,
 
 handle_info({'DOWN', Ref, process, Connection, Reason},
             #state{connection = Connection, connection_ref = Ref} = State) ->
-    error_logger:error_msg("fox_connection_worker, connection is DOWN: ~p", [Reason]),
+    error_or_info(Reason,
+                  "fox_connection_worker, connection is DOWN: ~p""fox_connection_worker, connection is DOWN: ~p",
+                  [Reason]),
     self() ! connect,
     {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
@@ -198,14 +200,18 @@ handle_info({'DOWN', Ref, process, Pid, Reason},
             #state{connection = Connection, channels_ets = ChannelsEts, subscriptions_ets = SubsEts} = State) ->
     case ets:lookup(ChannelsEts, Pid) of
         [{Pid, {caller, Pid, Ref}, {channel, ChannelPid, ChannelRef}}] ->
-            error_logger:error_msg("fox_connection_worker, process ~p, owner of channel ~p is DOWN: ~p", [Pid, ChannelPid, Reason]),
+            error_or_info(Reason,
+                          "fox_connection_worker, process ~p, owner of channel ~p is DOWN: ~p",
+                          [Pid, ChannelPid, Reason]),
             erlang:demonitor(Ref, [flush]),
             erlang:demonitor(ChannelRef, [flush]),
             ets:delete(ChannelsEts, Pid),
             ets:delete(ChannelsEts, ChannelPid),
             fox_utils:close_channel(ChannelPid);
         [{Pid, {caller, CallerPid, CallerRef}, {channel, Pid, Ref}}] ->
-            error_logger:info_msg("fox_connection_worker, channel ~p is DOWN: ~p", [Pid, Reason]),
+            error_or_info(Reason,
+                          "fox_connection_worker, channel ~p is DOWN: ~p",
+                          [Pid, Reason]),
             erlang:demonitor(CallerRef, [flush]),
             erlang:demonitor(Ref, [flush]),
             ets:delete(ChannelsEts, CallerPid),
@@ -220,7 +226,9 @@ handle_info({'DOWN', Ref, process, Pid, Reason},
     case ets:select(SubsEts, MS) of
         [] -> do_nothing;
         [Sub] ->
-            error_logger:error_msg("fox_connection_worker, channel or consumer ~p is DOWN: ~p", [Pid, Reason]),
+            error_or_info(Reason,
+                          "fox_connection_worker, channel or consumer ~p is DOWN: ~p",
+                          [Pid, Reason]),
             close_subscription(Sub),
             case Connection of
                 undefined -> do_nothing;
@@ -282,3 +290,10 @@ close_subscription(#subscription{channel_pid = ChannelPid, channel_ref = Channel
     fox_utils:close_channel(ChannelPid),
     Sub#subscription{channel_pid = undefined, channel_ref = undefined,
                      consumer_pid = undefined, consumer_ref = undefined}.
+
+
+error_or_info(normal, ErrMsg, Params) ->
+    error_logger:info_msg(ErrMsg, Params);
+
+error_or_info(_, ErrMsg, Params) ->
+    error_logger:error_msg(ErrMsg, Params).
