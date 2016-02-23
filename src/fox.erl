@@ -31,51 +31,51 @@ validate_params_network(Params) ->
     end.
 
 
--spec create_connection_pool(connection_name(), #amqp_params_network{} | map()) -> ok.
-create_connection_pool(ConnectionName, Params) when is_map(Params) ->
-    create_connection_pool(ConnectionName, fox_utils:map_to_params_network(Params));
+-spec create_connection_pool(pool_name(), #amqp_params_network{} | map()) -> ok.
+create_connection_pool(PoolName, Params) when is_map(Params) ->
+    create_connection_pool(PoolName, fox_utils:map_to_params_network(Params));
 
-create_connection_pool(ConnectionName, Params) ->
+create_connection_pool(PoolName, Params) ->
     true = fox_utils:validate_params_network_types(Params),
-    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
+    PoolName2 = fox_utils:name_to_atom(PoolName),
     {ok, PoolSize} = application:get_env(fox, connection_pool_size),
-    fox_connection_pool_sup:start_pool(ConnectionName2, Params, PoolSize),
+    fox_connection_pool_sup:start_pool(PoolName2, Params, PoolSize),
     ok.
 
 
--spec close_connection_pool(connection_name()) -> ok | {error, term()}.
-close_connection_pool(ConnectionName) ->
-    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
-    fox_connection_pool_sup:stop_pool(ConnectionName2).
+-spec close_connection_pool(pool_name()) -> ok | {error, term()}.
+close_connection_pool(PoolName) ->
+    PoolName2 = fox_utils:name_to_atom(PoolName),
+    fox_connection_pool_sup:stop_pool(PoolName2).
 
 
--spec create_channel(connection_name()) -> {ok, pid()} | {error, term()}.
-create_channel(ConnectionName) ->
-    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
-    fox_connection_pool_sup:create_channel(ConnectionName2).
+-spec create_channel(pool_name()) -> {ok, pid()} | {error, term()}.
+create_channel(PoolName) ->
+    PoolName2 = fox_utils:name_to_atom(PoolName),
+    fox_connection_pool_sup:create_channel(PoolName2).
 
 
--spec subscribe(connection_name(), subscribe_queue() | [subscribe_queue()], module()) ->
+-spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module()) ->
                        {ok, reference()} | {error, term()}.
-subscribe(ConnectionName, Queues, ConsumerModule) ->
-    subscribe(ConnectionName, Queues, ConsumerModule, []).
+subscribe(PoolName, Queues, ConsumerModule) ->
+    subscribe(PoolName, Queues, ConsumerModule, []).
 
 
--spec subscribe(connection_name(), subscribe_queue() | [subscribe_queue()], module(), list()) ->
+-spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module(), list()) ->
                        {ok, reference()} | {error, term()}.
-subscribe(ConnectionName, Queue, ConsumerModule, ConsumerModuleArgs) when not is_list(Queue) ->
-    subscribe(ConnectionName, [Queue], ConsumerModule, ConsumerModuleArgs);
+subscribe(PoolName, Queue, ConsumerModule, ConsumerModuleArgs) when not is_list(Queue) ->
+    subscribe(PoolName, [Queue], ConsumerModule, ConsumerModuleArgs);
 
-subscribe(ConnectionName, Queues, ConsumerModule, ConsumerModuleArgs) ->
+subscribe(PoolName, Queues, ConsumerModule, ConsumerModuleArgs) ->
     true = fox_utils:validate_consumer_behaviour(ConsumerModule),
-    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
-    fox_connection_pool_sup:subscribe(ConnectionName2, Queues, ConsumerModule, ConsumerModuleArgs).
+    PoolName2 = fox_utils:name_to_atom(PoolName),
+    fox_connection_pool_sup:subscribe(PoolName2, Queues, ConsumerModule, ConsumerModuleArgs).
 
 
--spec unsubscribe(connection_name(), pid()) -> ok | {error, term()}.
-unsubscribe(ConnectionName, ChannelPid) ->
-    ConnectionName2 = fox_utils:name_to_atom(ConnectionName),
-    fox_connection_pool_sup:unsubscribe(ConnectionName2, ChannelPid).
+-spec unsubscribe(pool_name(), pid()) -> ok | {error, term()}.
+unsubscribe(PoolName, ChannelPid) ->
+    PoolName2 = fox_utils:name_to_atom(PoolName),
+    fox_connection_pool_sup:unsubscribe(PoolName2, ChannelPid).
 
 
 -spec declare_exchange(pid(), binary()) -> ok | {error, term()}.
@@ -173,18 +173,25 @@ unbind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
     end.
 
 
--spec publish(pid(), binary(), binary(), binary()) -> ok | {error, term()}.
-publish(ChannelPid, Exchange, RoutingKey, Payload) ->
-    publish(ChannelPid, Exchange, RoutingKey, Payload, maps:new()).
+-spec publish(pool_name() | pid(), binary(), binary(), binary()) -> ok | {error, term()}.
+publish(PoolOrChannel, Exchange, RoutingKey, Payload) ->
+    publish(PoolOrChannel, Exchange, RoutingKey, Payload, maps:new()).
 
 
--spec publish(pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
-publish(ChannelPid, Exchange, RoutingKey, Payload, Params) when is_binary(Payload) ->
-    Publish = fox_utils:map_to_basic_publish(Params),
-    Publish2 = Publish#'basic.publish'{exchange = Exchange, routing_key = RoutingKey},
+-spec publish(pool_name() | pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
+publish(PoolOrChannel, Exchange, RoutingKey, Payload, Params) when is_binary(Payload) ->
+    Publish = fox_utils:map_to_basic_publish(Params#{exchange => Exchange, routing_key => RoutingKey}),
     PBasic = fox_utils:map_to_pbasic(Params),
     Message = #amqp_msg{payload = Payload, props = PBasic},
-    fox_utils:channel_cast(ChannelPid, Publish2, Message).
+    if
+        is_pid(PoolOrChannel) ->
+            fox_utils:channel_cast(PoolOrChannel, Publish, Message);
+        true -> PoolName = fox_utils:name_to_atom(PoolOrChannel),
+                case fox_connection_pool_sup:get_channel_for_pool(PoolName) of
+                    {ok, Channel} -> fox_utils:channel_cast(Channel, Publish, Message);
+                    {error, Reason} -> {error, Reason}
+                end
+    end.
 
 
 -spec(test_run() -> ok).
@@ -202,20 +209,25 @@ test_run() ->
 
     create_connection_pool("test_pool", Params),
 
-    Q1 = #'basic.consume'{queue = <<"my_queue">>},
-    Q2 = <<"other_queue">>,
-    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_channel_consumer),
+    %% Q1 = #'basic.consume'{queue = <<"my_queue">>},
+    %% Q2 = <<"other_queue">>,
+    %% {ok, Ref} = subscribe("test_pool", [Q1, Q2], sample_channel_consumer),
 
-    timer:sleep(500),
+    %% timer:sleep(500),
 
-    {ok, PChannel} = create_channel("test_pool"),
-    publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
-    publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
+    %% {ok, PChannel} = create_channel("test_pool"),
+    %% publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
+    %% publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
+    %% publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 3">>),
+    %% publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
 
     %% timer:sleep(1000),
 
     %% unsubscribe("test_pool", Ref),
     %% amqp_channel:close(PChannel),
-    %% close_connection_pool("test_pool"),
+    close_connection_pool("test_pool"),
+
+    create_connection_pool(pool_1, Params),
+    close_connection_pool(pool_1),
 
     ok.

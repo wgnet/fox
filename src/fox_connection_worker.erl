@@ -1,7 +1,7 @@
 -module(fox_connection_worker).
 -behavior(gen_server).
 
--export([start_link/1, get_info/1, create_channel/1, subscribe/4, unsubscribe/2, stop/1]).
+-export([start_link/2, get_info/1, create_channel/1, subscribe/4, unsubscribe/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -27,15 +27,16 @@
           params_network :: #amqp_params_network{},
           reconnect_attempt = 0 :: non_neg_integer(),
           channels_ets :: ets:tid(),
-          subscriptions_ets :: ets:tid()
+          subscriptions_ets :: ets:tid(),
+          channels_pool_pid :: pid()
          }).
 
 
 %%% module API
 
--spec start_link(term()) -> gs_start_link_reply().
-start_link(Params) ->
-    gen_server:start_link(?MODULE, Params, []).
+-spec start_link(term(), pid()) -> gs_start_link_reply().
+start_link(Params, ChannelsPoolPid) ->
+    gen_server:start_link(?MODULE, {Params, ChannelsPoolPid}, []).
 
 
 -spec get_info(pid()) -> {num_channel, integer()} | no_connection.
@@ -69,12 +70,15 @@ stop(Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(Params) ->
+init({Params, ChannelsPoolPid}) ->
     herd_rand:init_crypto(),
     T1 = ets:new(channels_ets, []),
     T2 = ets:new(subscriptions_ets, [{keypos, 2}]),
     self() ! connect,
-    {ok, #state{params_network = Params, channels_ets = T1, subscriptions_ets = T2}}.
+    {ok, #state{params_network = Params,
+                channels_ets = T1,
+                subscriptions_ets = T2,
+                channels_pool_pid = ChannelsPoolPid}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
@@ -161,7 +165,7 @@ handle_cast(Any, State) ->
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
 handle_info(connect, #state{connection = undefined, connection_ref = undefined,
                             params_network = Params, reconnect_attempt = Attempt,
-                            subscriptions_ets = TID} = State) ->
+                            subscriptions_ets = TID, channels_pool_pid = ChannelsPoolPid} = State) ->
     case amqp_connection:start(Params) of
         {ok, Connection} ->
             Ref = erlang:monitor(process, Connection),
@@ -175,6 +179,7 @@ handle_info(connect, #state{connection = undefined, connection_ref = undefined,
                                 ets:match(TID, '$1')),
             ets:delete_all_objects(TID),
             ets:insert(TID, NewSubs),
+            ChannelsPoolPid ! connections_ready,
             {noreply, State#state{connection = Connection, connection_ref = Ref, reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("fox_connection_worker could not connect to ~s ~p",

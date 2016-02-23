@@ -126,7 +126,7 @@ subscribe_state_test(_Config) ->
     ConnectionWorkerPid = get_connection_worker(subscribe_state_test),
     State = sys:get_state(ConnectionWorkerPid),
     ct:log("State: ~p", [State]),
-    {state, _, _, _, _, _, TID} = State,
+    {state, _, _, _, _, _, TID, _} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:log("EtsData: ~p", [EtsData]),
@@ -166,7 +166,7 @@ consumer_down_test(_Config) ->
 
     ConnectionWorkerPid = get_connection_worker(consumer_down_test),
     State = sys:get_state(ConnectionWorkerPid),
-    {state, _, _, _, _, _, TID} = State,
+    {state, _, _, _, _, _, TID, _} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:log("EtsData: ~p", [EtsData]),
@@ -237,7 +237,8 @@ consumer_down_test(_Config) ->
 -spec get_connection_worker(atom()) -> pid().
 get_connection_worker(PoolName) ->
     ConnectionSups = supervisor:which_children(fox_connection_pool_sup),
-    ConnectionSupPid = lists:foldl(fun({{fox_connection_sup, PName}, SupPid, _, _}, Acc) ->
+    ConnectionSupPid = lists:foldl(fun({{fox_publish_channels_pool, _}, _, _, _}, Acc) -> Acc;
+                                      ({{fox_connection_sup, PName}, SupPid, _, _}, Acc) ->
                                            case PName of
                                                PoolName -> SupPid;
                                                _ -> Acc

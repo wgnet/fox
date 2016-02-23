@@ -23,7 +23,7 @@
 
 %%% module API
 
--spec name_to_atom(connection_name()) -> atom().
+-spec name_to_atom(pool_name()) -> atom().
 name_to_atom(Name) when is_binary(Name) ->
     name_to_atom(erlang:binary_to_atom(Name, utf8));
 name_to_atom(Name) when is_list(Name) ->

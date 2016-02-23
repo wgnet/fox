@@ -22,10 +22,10 @@ init(ChannelPid, Args) ->
 
     ok = fox:declare_exchange(ChannelPid, Exchange),
 
-    ok = fox:declare_queue(ChannelPid, Queue1),
+    #'queue.declare_ok'{} = fox:declare_queue(ChannelPid, Queue1),
     ok = fox:bind_queue(ChannelPid, Queue1, Exchange, RoutingKey1),
 
-    ok = fox:declare_queue(ChannelPid, Queue2),
+    #'queue.declare_ok'{} = fox:declare_queue(ChannelPid, Queue2),
     ok = fox:bind_queue(ChannelPid, Queue2, Exchange, RoutingKey2),
 
     State = {Exchange, [{Queue1, RoutingKey1}, {Queue2, RoutingKey2}]},
