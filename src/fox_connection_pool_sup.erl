@@ -84,7 +84,7 @@ get_channel_for_pool(PoolName) ->
     ChildId = {fox_publish_channels_pool, PoolName},
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} ->
-            {ok, fox_publish_channels_pool:get_channel(ChildPid)};
+            fox_publish_channels_pool:get_channel(ChildPid);
         {error, not_found} -> {error, not_found}
     end.
 

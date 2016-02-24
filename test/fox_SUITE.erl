@@ -7,21 +7,15 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
--export([all/0,
-         init_per_suite/1, end_per_suite/1, init_per_testcase/2, end_per_testcase/2,
-         create_channel_test/1,
-         subscribe_test/1, subscribe_state_test/1,
-         consumer_down_test/1
-        ]).
-
+-compile([export_all]).
 
 -spec all() -> list().
 all() ->
-    [create_channel_test,
-     subscribe_test,
-     subscribe_state_test,
-     consumer_down_test
+    [create_channel_test
+    ,publish_test
+    ,subscribe_test
+    ,subscribe_state_test
+    ,consumer_down_test
     ].
 
 
@@ -63,6 +57,17 @@ create_channel_test(_Config) ->
     ok.
 
 
+
+-spec publish_test(list()) -> ok.
+publish_test(_Config) ->
+    Res = fox:publish(publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
+    true = (Res == ok orelse Res == {error, no_connection}),
+
+    timer:sleep(500),
+    ok = fox:publish(publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
+    ok.
+
+
 -spec subscribe_test(list()) -> ok.
 subscribe_test(_Config) ->
     T = ets:new(subscribe_test_ets, [public, named_table]),
@@ -86,7 +91,7 @@ subscribe_test(_Config) ->
                  ],
                  Res2),
 
-    fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hello!">>),
+    fox:publish(subscribe_test, <<"my_exchange">>, <<"my_key">>, <<"Hello!">>),
     timer:sleep(200),
     Res3 = lists:sort(SortF, ets:tab2list(T)),
     ct:log("Res3: ~p", [Res3]),

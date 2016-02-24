@@ -22,7 +22,7 @@ start_link(PoolName, PoolSize) ->
     gen_server:start_link(?MODULE, {PoolName, PoolSize}, []).
 
 
--spec get_channel(pid()) -> pid().
+-spec get_channel(pid()) -> {ok, pid()} | {error, no_connection}.
 get_channel(Pid) ->
     gen_server:call(Pid, get_channel).
 
@@ -41,12 +41,15 @@ init({PoolName, PoolSize}) ->
 
 
 -spec(handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply()).
+handle_call(get_channel, _From, #state{ready_channels = [], used_channels = []} = State) ->
+    {reply, {error, no_connection}, State};
+
 handle_call(get_channel, _From, #state{ready_channels = [], used_channels = UChannels} = State) ->
     [First | Rest] = lists:reverse(UChannels),
-    {reply, First, State#state{ready_channels = Rest, used_channels = [First]}};
+    {reply, {ok, First}, State#state{ready_channels = Rest, used_channels = [First]}};
 
 handle_call(get_channel, _From, #state{ready_channels = [Next | RChannels], used_channels = UChannels} = State) ->
-    {reply, Next, State#state{ready_channels = RChannels, used_channels = [Next | UChannels]}};
+    {reply, {ok, Next}, State#state{ready_channels = RChannels, used_channels = [Next | UChannels]}};
 
 handle_call(stop, _From, #state{ready_channels = RChannels, used_channels = UChannels} = State) ->
     lists:foreach(fun(Channel) ->
