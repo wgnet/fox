@@ -131,7 +131,7 @@ subscribe_state_test(_Config) ->
     ConnectionWorkerPid = get_connection_worker(subscribe_state_test),
     State = sys:get_state(ConnectionWorkerPid),
     ct:log("State: ~p", [State]),
-    {state, _, _, _, _, _, TID, _} = State,
+    {state, _, _, _, _, TID, _} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:log("EtsData: ~p", [EtsData]),
@@ -171,7 +171,7 @@ consumer_down_test(_Config) ->
 
     ConnectionWorkerPid = get_connection_worker(consumer_down_test),
     State = sys:get_state(ConnectionWorkerPid),
-    {state, _, _, _, _, _, TID, _} = State,
+    {state, _, _, _, _, TID, _} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:log("EtsData: ~p", [EtsData]),

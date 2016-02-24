@@ -209,25 +209,22 @@ test_run() ->
 
     create_connection_pool("test_pool", Params),
 
-    %% Q1 = #'basic.consume'{queue = <<"my_queue">>},
-    %% Q2 = <<"other_queue">>,
-    %% {ok, Ref} = subscribe("test_pool", [Q1, Q2], sample_channel_consumer),
+    Q1 = #'basic.consume'{queue = <<"my_queue">>},
+    Q2 = <<"other_queue">>,
+    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_channel_consumer),
 
-    %% timer:sleep(500),
+    timer:sleep(500),
 
-    %% {ok, PChannel} = create_channel("test_pool"),
-    %% publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
-    %% publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
-    %% publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 3">>),
-    %% publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
+    {ok, PChannel} = create_channel("test_pool"),
+    publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
+    publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
+    publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 3">>),
+    publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
 
     %% timer:sleep(1000),
 
     %% unsubscribe("test_pool", Ref),
     %% amqp_channel:close(PChannel),
-    close_connection_pool("test_pool"),
-
-    create_connection_pool(pool_1, Params),
-    close_connection_pool(pool_1),
+    %% close_connection_pool("test_pool"),
 
     ok.

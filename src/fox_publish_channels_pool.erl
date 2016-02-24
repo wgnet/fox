@@ -53,7 +53,7 @@ handle_call(get_channel, _From, #state{ready_channels = [Next | RChannels], used
 
 handle_call(stop, _From, #state{ready_channels = RChannels, used_channels = UChannels} = State) ->
     lists:foreach(fun(Channel) ->
-                          amqp_channel:close(Channel)
+                          fox_utils:close_channel(Channel)
                   end, RChannels ++ UChannels),
     {stop, normal, ok, State#state{ready_channels = [], used_channels = []}};
 
