@@ -14,14 +14,14 @@
 контролирует состояние соединений, при необходимости осуществляет
 реконнект прозрачно для пользователя.
 
-Вызов **fox:create_connection_pool(ConnectionName, Params)** создает пул из 5 соединений с заданными параметрами.
+Вызов **fox:create_connection_pool(PoolName, Params)** создает пул из 5 соединений с заданными параметрами.
 Имя может быть _atom()_, _string()_ или _binary()_.
 Параметры соединения могут быть записью
 [#amqp_params_network{}](https://github.com/jbrisbin/amqp_client/blob/master/include/amqp_client.hrl#L25)
 либо _map()_ с такими же полями.
 Размер пула можно изменить настройкой _connection\_pool\_size_.
 
-Вызов **fox:close_connection_pool(ConnectionName)** закрывает все соединения и удаляет пул.
+Вызов **fox:close_connection_pool(PoolName)** закрывает все соединения и удаляет пул.
 
 Перед созданием пула можно проверить параметры на валидность.
 Это делается вызовом **fox:validate_params_network(Params)**.
@@ -32,15 +32,18 @@
 
 ## Работа с каналами
 
-Во всех АПИ для работы с RabbitMQ (кроме fox:subscribe/2,3) требуется канал.
-Запросить канал можно вызовом **fox:create_channel(ConnectionName)**.
-При этом пул выбирает соединение, где открыто меньше всего каналов, и создает
+Во всех АПИ для работы с RabbitMQ (кроме fox:subscribe/2,3 и fox:publish/4,5) требуется канал.
+Запросить канал можно вызовом **fox:create_channel(PoolName)**.
+При этом пул выбирает соединение, где открыто меньше всего каналов и создает
 новый канал в этом соединении. Функция возвращает _{ok, ChannelPid}_ либо _{error, Reason}_.
 
 Пользователь должен закрыть канал, если канал больше не
 нужен. Библиотека сама не может определить, какие каналы используются,
 а какие нет.  Если пользователь будет динамически создавать каналы, и
 не будет закрывать их, это приведет к утечке ресурсов.
+
+Количество каналов на одно соединение ограничено настройкой **max_channels_per_connection**,
+по умолчанию -- 100 каналов.
 
 Канал закрывается вызовом **amqp_channel:close(ChannelPid)**.
 
@@ -49,7 +52,7 @@
 
 В библиотеке **amqp_client** взаимодействие с RabbitMQ большей частью осуществляется
 через вызовы **amqp_channel:call/cast**. Возможные действия и их параметры определяются
-записями, такими как: _basic.publish_, _exchange.declare_, _queue.bind_ и т.д.
+записями, такими как: _#'basic.publish'{}_, _#'exchange.declare'{}_, _#'queue.bind'{}_ и т.д.
 Полный их список можно посмотреть в
 [rabbit_framing.hrl](https://github.com/jbrisbin/rabbit_common/blob/master/include/rabbit_framing.hrl).
 Примеры использования **amqp_channel:call/cast** и этих записей можно посмотреть в документации
@@ -90,6 +93,22 @@ fox:publish(ChannelPid, X, Key, <<"foobar">>, #{delivery_mode => 2})
 _declare\_queue_, _delete\_queue_, _bind\_queue_, _unbind\_queue_.
 
 
+## Публикация
+
+Опубликовать сообщение можно с помощью вызова **fox:publish**.
+Первым аргументом передается либо _pid()_ канала, либо имя пула соединений.
+
+fox держит пул каналов для каждого пула соеденений специально для публикации сообщений.
+Если вы не хотите создавать, хранить и закрывать канал сами, то можете воспользоваться
+просто именем пула соединений.
+
+```erlang
+fox:publish(my_pool, Exchange, RougingKey, <<"Message">>)
+```
+
+Размер пула каналов задается настройкой **publish_pool_size**, по умолчанию -- 20 каналов.
+
+
 ## Подписка
 
 Пожалуй, самое неудобное в работе с **amqp_client**, это подписка.
@@ -98,18 +117,22 @@ _declare\_queue_, _delete\_queue_, _bind\_queue_, _unbind\_queue_.
 
 **fox** предлагает другой вариант.
 Пользователь создает модуль, реализующий behaviour **fox_channel_consumer**,
-и передает этот модуль в **fox:subscribe(ConnectionName, Module, Args)**.
+и передает этот модуль в **fox:subscribe(PoolName, Queues, Module, Args)**.
 Далее **fox** создает канал, подписывается в amqp_client:subscribe, получает сообщения
 и передает их для обработки в пользовательский модуль.
+
+Вторым аргументом передается список очередей, на которые нужно подписаться.
+Очередь может быть задана либо просто именем (_binary()_), либо записью _#'basic.consume'{}_.
+Второй вариант используется, если требуются дополнительные параметры очереди
+(exclusive, nowait, no_ack etc).
 
 Модуль должен определить 3 функции:
 
 **init(ChannelPid, Args)** --
 вызывается после создания канала, но до подписки его на сообщения.
 Здесь можно, например, создать нужные exchanges, queues и bingings.
-Функция должна вернуть список очередей, на которые нужно подписаться,
-(в виде объектов _basic.consume_)
-и _state_, который затем будет передаваться в _handle_ и _terminate_.
+Функция должна вернуть некий _state_, который затем будет передаваться
+в _handle_ и _terminate_.
 
 ```erlang
 init(ChannelPid, Args) ->
@@ -120,9 +143,7 @@ init(ChannelPid, Args) ->
     ok = fox:bind_queue(ChannelPid, Queue1, Exchange, RoutingKey1),
     ok = fox:declare_queue(ChannelPid, Queue2),
     ok = fox:bind_queue(ChannelPid, Queue2, Exchange, RoutingKey2),
-    BC1 = #'basic.consume'{queue = Queue1},
-    BC2 = #'basic.consume'{queue = Queue2},
-    {{subscribe, [BC1, BC2]}, State}.
+    {ok, State}.
 ```
 
 **handle(Data, ChannelPid, State)** --
@@ -134,6 +155,7 @@ init(ChannelPid, Args) ->
 handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, ChannelPid, State) ->
     ...
     amqp_channel:cast(ChannelPid, #'basic.ack'{delivery_tag = Tag}),
+    do_something,
     {ok, State};
 ```
 
@@ -154,5 +176,5 @@ terminate(ChannelPid, State) ->
 [sample_channel_consumer](src/sample_channel_consumer.erl)
 
 
-Вызов **fox:unsubscribe(ConnectionName, ChannelPid)** удаляет подписку,
+Вызов **fox:unsubscribe(PoolName, ChannelPid)** удаляет подписку,
 и закрывает канал.
