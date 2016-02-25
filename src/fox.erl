@@ -2,6 +2,7 @@
 
 -export([validate_params_network/1,
          create_connection_pool/2,
+         create_connection_pool/3,
          close_connection_pool/1,
          create_channel/1,
          subscribe/3, subscribe/4, unsubscribe/2,
@@ -32,13 +33,18 @@ validate_params_network(Params) ->
 
 
 -spec create_connection_pool(pool_name(), #amqp_params_network{} | map()) -> ok.
-create_connection_pool(PoolName, Params) when is_map(Params) ->
-    create_connection_pool(PoolName, fox_utils:map_to_params_network(Params));
-
 create_connection_pool(PoolName, Params) ->
+    {ok, PoolSize} = application:get_env(fox, connection_pool_size),
+    create_connection_pool(PoolName, Params, PoolSize).
+
+
+-spec create_connection_pool(pool_name(), #amqp_params_network{} | map(), integer()) -> ok.
+create_connection_pool(PoolName, Params, PoolSize) when is_map(Params) ->
+    create_connection_pool(PoolName, fox_utils:map_to_params_network(Params), PoolSize);
+
+create_connection_pool(PoolName, Params, PoolSize) ->
     true = fox_utils:validate_params_network_types(Params),
     PoolName2 = fox_utils:name_to_atom(PoolName),
-    {ok, PoolSize} = application:get_env(fox, connection_pool_size),
     fox_connection_pool_sup:start_pool(PoolName2, Params, PoolSize),
     ok.
 
