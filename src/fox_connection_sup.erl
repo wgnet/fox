@@ -43,10 +43,10 @@ subscribe(SupPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
     end.
 
 
--spec unsubscribe(pid(), pid()) -> ok | {error, term()}.
-unsubscribe(SupPid, ChannelPid) ->
+-spec unsubscribe(pid(), reference()) -> ok | {error, term()}.
+unsubscribe(SupPid, Ref) ->
     Res = lists:map(fun({_, ChildPid, _, _}) ->
-                            fox_connection_worker:unsubscribe(ChildPid, ChannelPid)
+                            fox_connection_worker:unsubscribe(ChildPid, Ref)
                     end,
                     supervisor:which_children(SupPid)),
     case lists:member(ok, Res) of

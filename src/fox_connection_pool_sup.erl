@@ -65,7 +65,7 @@ stop_pool(PoolName) ->
             fox_connection_sup:stop(ChildPid2),
             ok = supervisor:terminate_child(?MODULE, ChildId2),
             supervisor:delete_child(?MODULE, ChildId2);
-        {error, not_found} -> {error, not_found}
+        {error, not_found} -> {error, pool_not_found}
     end.
 
 
@@ -75,7 +75,7 @@ create_channel(PoolName) ->
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} ->
             fox_connection_sup:create_channel(ChildPid);
-        {error, not_found} -> {error, not_found}
+        {error, not_found} -> {error, pool_not_found}
     end.
 
 
@@ -85,7 +85,7 @@ get_channel_for_pool(PoolName) ->
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} ->
             fox_publish_channels_pool:get_channel(ChildPid);
-        {error, not_found} -> {error, not_found}
+        {error, not_found} -> {error, pool_not_found}
     end.
 
 
@@ -95,17 +95,17 @@ subscribe(PoolName, Queues, ConsumerModule, ConsumerModuleArgs) ->
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} ->
             fox_connection_sup:subscribe(ChildPid, Queues, ConsumerModule, ConsumerModuleArgs);
-        {error, not_found} -> {error, not_found}
+        {error, not_found} -> {error, pool_not_found}
     end.
 
 
--spec unsubscribe(atom(), pid()) -> ok | {error, term()}.
-unsubscribe(PoolName, ChannelPid) ->
+-spec unsubscribe(atom(), reference()) -> ok | {error, term()}.
+unsubscribe(PoolName, Ref) ->
     ChildId = {fox_connection_sup, PoolName},
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} ->
-            fox_connection_sup:unsubscribe(ChildPid, ChannelPid);
-        {error, not_found} -> {error, not_found}
+            fox_connection_sup:unsubscribe(ChildPid, Ref);
+        {error, not_found} -> {error, pool_not_found}
     end.
 
 

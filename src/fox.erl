@@ -78,10 +78,10 @@ subscribe(PoolName, Queues, ConsumerModule, ConsumerModuleArgs) ->
     fox_connection_pool_sup:subscribe(PoolName2, Queues, ConsumerModule, ConsumerModuleArgs).
 
 
--spec unsubscribe(pool_name(), pid()) -> ok | {error, term()}.
-unsubscribe(PoolName, ChannelPid) ->
+-spec unsubscribe(pool_name(), reference()) -> ok | {error, term()}.
+unsubscribe(PoolName, Ref) ->
     PoolName2 = fox_utils:name_to_atom(PoolName),
-    fox_connection_pool_sup:unsubscribe(PoolName2, ChannelPid).
+    fox_connection_pool_sup:unsubscribe(PoolName2, Ref).
 
 
 -spec declare_exchange(pid(), binary()) -> ok | {error, term()}.
