@@ -189,12 +189,17 @@ publish(PoolOrChannel, Exchange, RoutingKey, Payload, Params) when is_binary(Pay
     Publish = fox_utils:map_to_basic_publish(Params#{exchange => Exchange, routing_key => RoutingKey}),
     PBasic = fox_utils:map_to_pbasic(Params),
     Message = #amqp_msg{payload = Payload, props = PBasic},
+
+    PublishFun = case Params of
+                     #{synchronous := true} -> channel_call;
+                     _ -> channel_cast
+                 end,
     if
         is_pid(PoolOrChannel) ->
-            fox_utils:channel_cast(PoolOrChannel, Publish, Message);
+            fox_utils:PublishFun(PoolOrChannel, Publish, Message);
         true -> PoolName = fox_utils:name_to_atom(PoolOrChannel),
-                case fox_connection_pool_sup:get_channel_for_pool(PoolName) of
-                    {ok, Channel} -> fox_utils:channel_cast(Channel, Publish, Message);
+                case fox_connection_pool_sup:get_publish_channel(PoolName) of
+                    {ok, Channel} -> fox_utils:PublishFun(Channel, Publish, Message);
                     {error, Reason} -> {error, Reason}
                 end
     end.

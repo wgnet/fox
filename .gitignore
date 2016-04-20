@@ -8,3 +8,5 @@ TAGS
 erl_crash.dump
 _build
 rebar.lock
+.idea
+*.iml

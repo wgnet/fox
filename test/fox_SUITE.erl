@@ -13,6 +13,7 @@
 all() ->
     [create_channel_test
     ,publish_test
+    ,sync_publish_test
     ,subscribe_test
     ,subscribe_state_test
     ,consumer_down_test
@@ -57,7 +58,6 @@ create_channel_test(_Config) ->
     ok.
 
 
-
 -spec publish_test(list()) -> ok.
 publish_test(_Config) ->
     Res = fox:publish(publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
@@ -65,6 +65,13 @@ publish_test(_Config) ->
 
     timer:sleep(500),
     ok = fox:publish(publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
+    ok.
+
+
+-spec sync_publish_test(list()) -> ok.
+sync_publish_test(_Config) ->
+    timer:sleep(500),
+    ok = fox:publish(sync_publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>, #{synchronous => true}),
     ok.
 
 
