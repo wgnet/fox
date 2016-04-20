@@ -195,11 +195,14 @@ publish(PoolOrChannel, Exchange, RoutingKey, Payload, Params) when is_binary(Pay
                      _ -> channel_cast
                  end,
     if
-        is_pid(PoolOrChannel) ->
-            fox_utils:PublishFun(PoolOrChannel, Publish, Message);
+        is_pid(PoolOrChannel) -> fox_utils:PublishFun(PoolOrChannel, Publish, Message);
         true -> PoolName = fox_utils:name_to_atom(PoolOrChannel),
-                case fox_connection_pool_sup:get_publish_channel(PoolName) of
-                    {ok, Channel} -> fox_utils:PublishFun(Channel, Publish, Message);
+                case fox_connection_pool_sup:get_publish_pool(PoolName) of
+                    {ok, PoolPid} ->
+                        case fox_publish_channels_pool:get_channel(PoolPid) of
+                            {ok, Channel} -> fox_utils:PublishFun(Channel, Publish, Message);
+                            {error, Reason} -> {error, Reason}
+                        end;
                     {error, Reason} -> {error, Reason}
                 end
     end.

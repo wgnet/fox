@@ -14,6 +14,7 @@ all() ->
     [create_channel_test
     ,publish_test
     ,sync_publish_test
+    ,publish_pool_test
     ,subscribe_test
     ,subscribe_state_test
     ,consumer_down_test
@@ -23,6 +24,7 @@ all() ->
 -spec init_per_suite(list()) -> list().
 init_per_suite(Config) ->
     application:ensure_all_started(fox),
+    application:set_env(fox, publish_pool_size, 4),
     Config.
 
 
@@ -63,15 +65,46 @@ publish_test(_Config) ->
     Res = fox:publish(publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
     true = (Res == ok orelse Res == {error, no_connection}),
 
-    timer:sleep(500),
+    timer:sleep(200),
     ok = fox:publish(publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
     ok.
 
 
 -spec sync_publish_test(list()) -> ok.
 sync_publish_test(_Config) ->
-    timer:sleep(500),
+    timer:sleep(200),
     ok = fox:publish(sync_publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>, #{synchronous => true}),
+    ok.
+
+
+-spec publish_pool_test(list()) -> ok.
+publish_pool_test(_Config) ->
+    timer:sleep(200),
+    {ok, PoolPid} = fox_connection_pool_sup:get_publish_pool(publish_pool_test),
+    {state, publish_pool_test, 4, 0, [], []} = sys:get_state(PoolPid),
+
+    States =
+    [
+        {4, 1, 0, 1},
+        {4, 2, 0, 2},
+        {4, 3, 0, 3},
+        {4, 4, 0, 4},
+        {4, 4, 3, 1},
+        {4, 4, 2, 2},
+        {4, 4, 1, 3},
+        {4, 4, 0, 4},
+        {4, 4, 3, 1}
+    ],
+    lists:map(
+        fun({PoolSize, NumChannels, RLen, ULen}) ->
+            ok = fox:publish(publish_pool_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
+            State = sys:get_state(PoolPid),
+            ?assertMatch({state, publish_pool_test, PoolSize, NumChannels, _, _}, State),
+            {state, publish_pool_test, PoolSize, NumChannels, R, U} = State,
+            ?assertEqual(RLen, length(R)),
+            ?assertEqual(ULen, length(U))
+        end,
+        States),
     ok.
 
 
