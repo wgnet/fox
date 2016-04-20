@@ -1,7 +1,7 @@
 -module(fox_connection_sup).
 -behaviour(supervisor).
 
--export([start_link/3, init/1, create_channel/1, subscribe/4, unsubscribe/2, stop/1]).
+-export([start_link/2, init/1, create_channel/1, subscribe/4, unsubscribe/2, stop/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -9,16 +9,16 @@
 
 %% Module API
 
--spec start_link(#amqp_params_network{}, integer(), pid()) -> {ok, pid()} | {error, term()}.
-start_link(Params, PoolSize, ChannelsPoolPid) ->
-    supervisor:start_link(?MODULE, {Params, PoolSize, ChannelsPoolPid}).
+-spec start_link(#amqp_params_network{}, integer()) -> {ok, pid()} | {error, term()}.
+start_link(Params, PoolSize) ->
+    supervisor:start_link(?MODULE, {Params, PoolSize}).
 
 
 -spec init(gs_args()) -> sup_init_reply().
-init({Params, PoolSize, ChannelsPoolPid}) ->
+init({Params, PoolSize}) ->
     Spec = fun(Id) ->
                    {{fox_connection_worker, Id},
-                    {fox_connection_worker, start_link, [Params, ChannelsPoolPid]},
+                    {fox_connection_worker, start_link, [Params]},
                     transient, 2000, worker,
                     [fox_connection_worker]}
            end,

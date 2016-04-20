@@ -31,13 +31,13 @@ start_pool(PoolName, Params, PoolSize) ->
                           [PoolName, fox_utils:params_network_to_str(Params), PoolSize]),
     PublishChannelsPool =
         {{fox_publish_channels_pool, PoolName},
-         {fox_publish_channels_pool, start_link, [PoolName, PoolSize]},
+         {fox_publish_channels_pool, start_link, [PoolName]},
          transient, 2000, worker,
          [fox_publish_channels_pool]},
     case supervisor:start_child(?MODULE, PublishChannelsPool) of
-        {ok, Pid} ->
+        {ok, _} ->
             ConnectionPoolSup = {{fox_connection_sup, PoolName},
-                                 {fox_connection_sup, start_link, [Params, PoolSize, Pid]},
+                                 {fox_connection_sup, start_link, [Params, PoolSize]},
                                  transient, 2000, supervisor,
                                  [fox_connection_sup]},
             case supervisor:start_child(?MODULE, ConnectionPoolSup) of
