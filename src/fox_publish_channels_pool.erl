@@ -9,9 +9,7 @@
 -record(state, {
           pool_name :: atom(),
           pool_size :: integer(),
-          num_channels = 0 :: integer(),
-          ready_channels = [] :: [pid()],
-          used_channels = [] :: [pid()]
+          channels :: queue:queue()
          }).
 
 
@@ -38,30 +36,35 @@ stop(Pid) ->
 init(PoolName) ->
     {ok, PoolSize} = application:get_env(fox, publish_pool_size),
     error_logger:info_msg("init publish channels pool ~p of size ~p", [PoolName, PoolSize]),
-    {ok, #state{pool_name = PoolName, pool_size = PoolSize, num_channels = 0}}.
+    {ok, #state{pool_name = PoolName, pool_size = PoolSize, channels = queue:new()}}.
 
 
 -spec(handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply()).
-handle_call(get_channel, _From,
-    #state{pool_name = PoolName, pool_size = PoolSize, num_channels = NumChannels, used_channels = U} = State)
-    when PoolSize > NumChannels ->
-    case fox:create_channel(PoolName) of
-        {ok, Pid} -> {reply, {ok, Pid}, State#state{used_channels = [Pid | U], num_channels = NumChannels + 1}};
-        {error, Reason} -> {reply, {error, Reason}, State}
+handle_call(get_channel, _From, #state{pool_name = PoolName, pool_size = PoolSize, channels = Channels} = State) ->
+    NumChannels = queue:len(Channels),
+    if
+        NumChannels < PoolSize ->
+            case fox:create_channel(PoolName) of
+                {ok, Channel} ->
+                    {reply, {ok, Channel}, State#state{channels = queue:in(Channel, Channels)}};
+                {error, Reason} ->
+                    {reply, {error, Reason}, State}
+            end;
+        true ->
+            {{value, Channel}, Channels2} = queue:out(Channels),
+            case check_channel_alive(Channel, PoolName) of
+                {ok, AliveChannel} ->
+                    {reply, {ok, AliveChannel}, State#state{channels = queue:in(AliveChannel, Channels2)}};
+                {error, Reason} ->
+                    {reply, {error, Reason}, State#state{channels = Channels2}}
+            end
     end;
 
-handle_call(get_channel, _From, #state{ready_channels = [], used_channels = U} = State) ->
-    [First | Rest] = lists:reverse(U),
-    {reply, {ok, First}, State#state{ready_channels = Rest, used_channels = [First]}};
-
-handle_call(get_channel, _From, #state{ready_channels = [Next | R], used_channels = U} = State) ->
-    {reply, {ok, Next}, State#state{ready_channels = R, used_channels = [Next | U]}};
-
-handle_call(stop, _From, #state{ready_channels = R, used_channels = U} = State) ->
+handle_call(stop, _From, #state{channels = Channels} = State) ->
     lists:foreach(fun(Channel) ->
                           fox_utils:close_channel(Channel)
-                  end, R ++ U),
-    {stop, normal, ok, State#state{ready_channels = [], used_channels = [], num_channels = 0}};
+                  end, queue:to_list(Channels)),
+    {stop, normal, ok, State#state{channels = queue:new()}};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
@@ -92,3 +95,9 @@ code_change(_OldVersion, State, _Extra) ->
 
 
 %%% inner functions
+
+check_channel_alive(Channel, PoolName) ->
+    case erlang:is_process_alive(Channel) of
+        true -> {ok, Channel};
+        false -> fox:create_channel(PoolName)
+    end.

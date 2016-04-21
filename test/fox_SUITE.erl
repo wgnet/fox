@@ -81,30 +81,17 @@ sync_publish_test(_Config) ->
 publish_pool_test(_Config) ->
     timer:sleep(200),
     {ok, PoolPid} = fox_connection_pool_sup:get_publish_pool(publish_pool_test),
-    {state, publish_pool_test, 4, 0, [], []} = sys:get_state(PoolPid),
 
-    States =
-    [
-        {4, 1, 0, 1},
-        {4, 2, 0, 2},
-        {4, 3, 0, 3},
-        {4, 4, 0, 4},
-        {4, 4, 3, 1},
-        {4, 4, 2, 2},
-        {4, 4, 1, 3},
-        {4, 4, 0, 4},
-        {4, 4, 3, 1}
-    ],
+    {state, publish_pool_test, 4, Channels} = sys:get_state(PoolPid),
+    ?assertEqual(0, queue:len(Channels)),
+
     lists:map(
-        fun({PoolSize, NumChannels, RLen, ULen}) ->
+        fun(NumChannels) ->
             ok = fox:publish(publish_pool_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
-            State = sys:get_state(PoolPid),
-            ?assertMatch({state, publish_pool_test, PoolSize, NumChannels, _, _}, State),
-            {state, publish_pool_test, PoolSize, NumChannels, R, U} = State,
-            ?assertEqual(RLen, length(R)),
-            ?assertEqual(ULen, length(U))
+            {state, publish_pool_test, 4, Ch} = sys:get_state(PoolPid),
+            ?assertEqual(NumChannels, queue:len(Ch))
         end,
-        States),
+        [1, 2, 3, 4, 4, 4]),
     ok.
 
 
