@@ -5,7 +5,7 @@
          init/1,
          start_pool/3, stop_pool/1,
          create_channel/1,
-         get_publish_pool/1,
+         get_publish_pool/1, get_publish_channel/1,
          subscribe/4, unsubscribe/2
         ]).
 
@@ -85,6 +85,14 @@ get_publish_pool(PoolName) ->
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} -> {ok, ChildPid};
         {error, not_found} -> {error, pool_not_found}
+    end.
+
+
+-spec get_publish_channel(atom()) -> {ok, pid()} | {error, term()}.
+get_publish_channel(PoolName) ->
+    case get_publish_pool(PoolName) of
+        {ok, PoolPid} -> fox_publish_channels_pool:get_channel(PoolPid);
+        {error, Reason} -> {error, Reason}
     end.
 
 

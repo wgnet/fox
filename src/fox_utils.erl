@@ -13,6 +13,7 @@
          map_to_queue_unbind/1,
          map_to_basic_publish/1,
          map_to_pbasic/1,
+         map_to_basic_qos/1,
          close_connection/1, close_channel/1, close_consumer/1,
          channel_call/2, channel_call/3,
          channel_cast/2, channel_cast/3
@@ -214,6 +215,15 @@ map_to_pbasic(Params) ->
        app_id = maps:get(app_id, Params, undefined),
        cluster_id = maps:get(cluster_id, Params, undefined)
       }.
+
+
+-spec map_to_basic_qos(map()) -> #'basic.qos'{}.
+map_to_basic_qos(Params) ->
+    #'basic.qos'{
+        prefetch_size = maps:get(prefetch_size, Params, 0),
+        prefetch_count = maps:get(prefetch_count, Params, 0),
+        global = maps:get(global, Params, false)
+    }.
 
 
 -spec close_connection(pid()) -> ok.

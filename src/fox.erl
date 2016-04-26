@@ -13,6 +13,7 @@
          bind_queue/4, bind_queue/5,
          unbind_queue/4, unbind_queue/5,
          publish/4, publish/5,
+         qos/2,
          test_run/0]).
 
 -include("fox.hrl").
@@ -197,14 +198,27 @@ publish(PoolOrChannel, Exchange, RoutingKey, Payload, Params) when is_binary(Pay
     if
         is_pid(PoolOrChannel) -> fox_utils:PublishFun(PoolOrChannel, Publish, Message);
         true -> PoolName = fox_utils:name_to_atom(PoolOrChannel),
-                case fox_connection_pool_sup:get_publish_pool(PoolName) of
-                    {ok, PoolPid} ->
-                        case fox_publish_channels_pool:get_channel(PoolPid) of
-                            {ok, Channel} -> fox_utils:PublishFun(Channel, Publish, Message);
-                            {error, Reason} -> {error, Reason}
-                        end;
+                case fox_connection_pool_sup:get_publish_channel(PoolName) of
+                    {ok, Channel} -> fox_utils:PublishFun(Channel, Publish, Message);
                     {error, Reason} -> {error, Reason}
                 end
+    end.
+
+
+-spec qos(pool_name() | pid(), map()) -> ok | {error, term()}.
+qos(PoolOrChannel, Params) ->
+    QoS = fox_utils:map_to_basic_qos(Params),
+    if
+        is_pid(PoolOrChannel) ->
+            #'basic.qos_ok'{} = amqp_channel:call(PoolOrChannel, QoS),
+            ok;
+        true -> PoolName = fox_utils:name_to_atom(PoolOrChannel),
+            case fox_connection_pool_sup:get_publish_channel(PoolName) of
+                {ok, Channel} ->
+                    #'basic.qos_ok'{} = amqp_channel:call(Channel, QoS),
+                    ok;
+                {error, Reason} -> {error, Reason}
+            end
     end.
 
 
@@ -222,6 +236,7 @@ test_run() ->
     {error, {auth_failure, _}} = validate_params_network(Params#{username => <<"Bob">>}),
 
     create_connection_pool("test_pool", Params),
+    qos("test_pool", #{prefetch_count => 10}),
 
     Q1 = #'basic.consume'{queue = <<"my_queue">>},
     Q2 = <<"other_queue">>,
