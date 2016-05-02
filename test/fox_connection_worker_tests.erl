@@ -15,7 +15,7 @@ setup() ->
 
 start_link_test() ->
     Params = setup(),
-    Res = fox_connection_worker:start_link(Params),
+    Res = fox_connection_worker:start_link(Params, #{}),
     ?assertMatch({ok, _}, Res),
     {ok, Pid} = Res,
     ?assertMatch({status, _}, erlang:process_info(Pid, status)),
@@ -28,7 +28,7 @@ start_link_test() ->
 
 channels_test() ->
     Params = setup(),
-    {ok, Pid} = fox_connection_worker:start_link(Params),
+    {ok, Pid} = fox_connection_worker:start_link(Params, #{}),
     ?assertEqual({num_channels, 0}, fox_connection_worker:get_info(Pid)),
 
     {ok, C1} = fox_connection_worker:create_channel(Pid),

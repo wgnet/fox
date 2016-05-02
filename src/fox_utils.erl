@@ -16,7 +16,8 @@
          map_to_basic_qos/1,
          close_connection/1, close_channel/1, close_consumer/1,
          channel_call/2, channel_call/3,
-         channel_cast/2, channel_cast/3
+         channel_cast/2, channel_cast/3,
+         call_callback/1
         ]).
 
 -include("fox.hrl").
@@ -292,3 +293,10 @@ channel_cast(ChannelPid, Method, Content) ->
     catch
         exit:{noproc, _} -> {error, invalid_channel}
     end.
+
+
+-spec call_callback(fox_callback()) -> term().
+call_callback({P, M}) when is_pid(P) -> P ! M;
+call_callback({M, F}) when is_atom(M) andalso is_atom(F) -> erlang:apply(M, F, []);
+call_callback(F) when is_function(F) -> F();
+call_callback(undefined) -> do_nothing.

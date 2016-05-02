@@ -21,6 +21,17 @@ all() ->
     ].
 
 
+-record(state, {
+    connection :: pid(),
+    connection_ref :: reference(),
+    params_network :: #amqp_params_network{},
+    connect_callback :: fox_callback(),
+    disconnect_callback :: fox_callback(),
+    reconnect_attempt = 0 :: non_neg_integer(),
+    subscriptions_ets :: ets:tid()
+}).
+
+
 -spec init_per_suite(list()) -> list().
 init_per_suite(Config) ->
     application:ensure_all_started(fox),
@@ -158,7 +169,7 @@ subscribe_state_test(_Config) ->
     ConnectionWorkerPid = get_connection_worker(subscribe_state_test),
     State = sys:get_state(ConnectionWorkerPid),
     ct:log("State: ~p", [State]),
-    {state, _, _, _, _, TID} = State,
+    #state{subscriptions_ets = TID} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:log("EtsData: ~p", [EtsData]),
@@ -198,7 +209,7 @@ consumer_down_test(_Config) ->
 
     ConnectionWorkerPid = get_connection_worker(consumer_down_test),
     State = sys:get_state(ConnectionWorkerPid),
-    {state, _, _, _, _, TID} = State,
+    #state{subscriptions_ets = TID} = State,
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:log("EtsData: ~p", [EtsData]),

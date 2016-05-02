@@ -1,7 +1,7 @@
 -module(fox_connection_worker).
 -behavior(gen_server).
 
--export([start_link/1, get_info/1, create_channel/1, subscribe/4, unsubscribe/2, stop/1]).
+-export([start_link/2, get_info/1, create_channel/1, subscribe/4, unsubscribe/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -25,6 +25,8 @@
           connection :: pid(),
           connection_ref :: reference(),
           params_network :: #amqp_params_network{},
+          connect_callback :: fox_callback(),
+          disconnect_callback :: fox_callback(),
           reconnect_attempt = 0 :: non_neg_integer(),
           subscriptions_ets :: ets:tid()
          }).
@@ -32,9 +34,9 @@
 
 %%% module API
 
--spec start_link(term()) -> gs_start_link_reply().
-start_link(Params) ->
-    gen_server:start_link(?MODULE, Params, []).
+-spec start_link(#amqp_params_network{}, map()) -> gs_start_link_reply().
+start_link(ConnectionParams, OtherParams) ->
+    gen_server:start_link(?MODULE, {ConnectionParams, OtherParams}, []).
 
 
 -spec get_info(pid()) -> {num_channel, integer()} | no_connection.
@@ -68,11 +70,16 @@ stop(Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(Params) ->
+init({ConnectionParams, OtherParams}) ->
     herd_rand:init_crypto(),
     TID = ets:new(subscriptions_ets, [{keypos, 2}]),
     self() ! connect,
-    {ok, #state{params_network = Params, subscriptions_ets = TID }}.
+    {ok, #state{
+        params_network = ConnectionParams,
+        connect_callback = maps:get(connect_callback, OtherParams, undefined),
+        disconnect_callback = maps:get(disconnect_callback, OtherParams, undefined),
+        subscriptions_ets = TID
+    }}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
@@ -146,6 +153,7 @@ handle_cast(Any, State) ->
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
 handle_info(connect, #state{connection = undefined, connection_ref = undefined,
                             params_network = Params, reconnect_attempt = Attempt,
+                            connect_callback = Callback,
                             subscriptions_ets = TID} = State) ->
     case amqp_connection:start(Params) of
         {ok, Connection} ->
@@ -160,6 +168,7 @@ handle_info(connect, #state{connection = undefined, connection_ref = undefined,
                                 ets:match(TID, '$1')),
             ets:delete_all_objects(TID),
             ets:insert(TID, NewSubs),
+            fox_utils:call_callback(Callback),
             {noreply, State#state{connection = Connection, connection_ref = Ref, reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("fox_connection_worker could not connect to ~s ~p",
@@ -174,11 +183,12 @@ handle_info(connect, #state{connection = undefined, connection_ref = undefined,
     end;
 
 handle_info({'DOWN', Ref, process, Connection, Reason},
-            #state{connection = Connection, connection_ref = Ref} = State) ->
+            #state{connection = Connection, connection_ref = Ref, disconnect_callback = Callback} = State) ->
     error_or_info(Reason,
                   "fox_connection_worker, connection is DOWN: ~p""fox_connection_worker, connection is DOWN: ~p",
                   [Reason]),
     self() ! connect,
+    fox_utils:call_callback(Callback),
     {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
 handle_info({'DOWN', Ref, process, Pid, Reason}, #state{connection = Connection, subscriptions_ets = TID} = State) ->

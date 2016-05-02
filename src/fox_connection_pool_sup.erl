@@ -3,7 +3,7 @@
 
 -export([start_link/0,
          init/1,
-         start_pool/3, stop_pool/1,
+         start_pool/4, stop_pool/1,
          create_channel/1,
          get_publish_pool/1, get_publish_channel/1,
          subscribe/4, unsubscribe/2
@@ -25,10 +25,10 @@ init(_Args) ->
     {ok, {{one_for_one, 10, 60}, []}}.
 
 
--spec start_pool(atom(), #amqp_params_network{}, integer()) -> ok | {error, term()}.
-start_pool(PoolName, Params, PoolSize) ->
+-spec start_pool(atom(), #amqp_params_network{}, map(), integer()) -> ok | {error, term()}.
+start_pool(PoolName, ConnectionParams, OtherParams, PoolSize) ->
     error_logger:info_msg("fox start pool ~p ~s of size ~p",
-                          [PoolName, fox_utils:params_network_to_str(Params), PoolSize]),
+                          [PoolName, fox_utils:params_network_to_str(ConnectionParams), PoolSize]),
     PublishChannelsPool =
         {{fox_publish_channels_pool, PoolName},
          {fox_publish_channels_pool, start_link, [PoolName]},
@@ -37,7 +37,7 @@ start_pool(PoolName, Params, PoolSize) ->
     case supervisor:start_child(?MODULE, PublishChannelsPool) of
         {ok, _} ->
             ConnectionPoolSup = {{fox_connection_sup, PoolName},
-                                 {fox_connection_sup, start_link, [Params, PoolSize]},
+                                 {fox_connection_sup, start_link, [ConnectionParams, OtherParams, PoolSize]},
                                  transient, 2000, supervisor,
                                  [fox_connection_sup]},
             case supervisor:start_child(?MODULE, ConnectionPoolSup) of
