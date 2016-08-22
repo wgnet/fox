@@ -36,22 +36,21 @@ name_to_atom(Name) -> Name.
 -spec map_to_params_network(map()) -> #amqp_params_network{}.
 map_to_params_network(Params) when is_map(Params) ->
     #amqp_params_network{
-       host = maps:get(host, Params),
-       port = maps:get(port, Params),
-       virtual_host = maps:get(virtual_host, Params),
-       username = maps:get(username, Params),
-       password = maps:get(password, Params),
-       heartbeat = maps:get(heartbeat, Params, 10),
-       connection_timeout = maps:get(connection_timeout, Params, 10),
-       channel_max = maps:get(channel_max, Params, 0),
-       frame_max = maps:get(frame_max, Params, 0),
-       ssl_options = maps:get(ssl_options, Params, none),
-       auth_mechanisms = maps:get(auth_mechanisms, Params,
-                                  [fun amqp_auth_mechanisms:plain/3,
-                                   fun amqp_auth_mechanisms:amqplain/3]),
-       client_properties = maps:get(client_properties, Params, []),
-       socket_options = maps:get(socket_options, Params, [])
-      }.
+        username = maps:get(username, Params, <<"guest">>),
+        password = maps:get(password, Params, <<"guest">>),
+        virtual_host = maps:get(virtual_host, Params, <<"/">>),
+        host = maps:get(host, Params, "localhost"),
+        port = maps:get(port, Params, undefined),
+        channel_max = maps:get(channel_max, Params, 0),
+        frame_max = maps:get(frame_max, Params, 0),
+        heartbeat = maps:get(heartbeat, Params, 0), % seconds
+        connection_timeout = maps:get(connection_timeout, Params, 10000), % milliseconds
+        ssl_options = maps:get(ssl_options, Params, none),
+        auth_mechanisms = maps:get(auth_mechanisms, Params,
+            [fun amqp_auth_mechanisms:plain/3, fun amqp_auth_mechanisms:amqplain/3]),
+        client_properties = maps:get(client_properties, Params, []),
+        socket_options = maps:get(socket_options, Params, [])
+    }.
 
 
 -spec params_network_to_str(#amqp_params_network{}) -> iolist().

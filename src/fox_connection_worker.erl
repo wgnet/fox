@@ -41,7 +41,7 @@ start_link(ConnectionParams, OtherParams) ->
 
 -spec get_info(pid()) -> {num_channel, integer()} | no_connection.
 get_info(Pid) ->
-    case gen_server:call(Pid, get_connection) of
+    case gen_server:call(Pid, get_connection, 15000) of
         undefined -> no_connection;
         Connection -> hd(amqp_connection:info(Connection, [num_channels]))
     end.
@@ -126,9 +126,7 @@ handle_call({unsubscribe, Ref}, _From, #state{subscriptions_ets = TID} = State) 
 
 handle_call(stop, _From, #state{connection = Connection,
                                 connection_ref = Ref,
-                                params_network = Params,
                                 subscriptions_ets = TID} = State) ->
-    error_logger:info_msg("fox_connection_worker close connection ~s", [fox_utils:params_network_to_str(Params)]),
     case Connection of
         undefined -> do_nothing;
         Pid ->
@@ -158,8 +156,6 @@ handle_info(connect, #state{connection = undefined, connection_ref = undefined,
     case amqp_connection:start(Params) of
         {ok, Connection} ->
             Ref = erlang:monitor(process, Connection),
-            error_logger:info_msg("fox_connection_worker connected to ~s",
-                                  [fox_utils:params_network_to_str(Params)]),
             NewSubs = lists:map(fun([Sub]) ->
                                         close_subscription(Sub),
                                         {ok, Sub2} = do_subscription(Connection, Sub),
