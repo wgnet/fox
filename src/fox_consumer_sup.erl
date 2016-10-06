@@ -1,4 +1,4 @@
--module(fox_channel_sup).
+-module(fox_consumer_sup).
 -behaviour(supervisor).
 
 -export([start_link/0, start_worker/4, init/1]).

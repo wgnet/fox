@@ -236,7 +236,7 @@ code_change(_OldVersion, State, _Extra) ->
 do_subscription(Connection, #subscription{consumer_module = ConsumerModule, consumer_args = ConsumerArgs, queues = Queues} = Sub) ->
     case amqp_connection:open_channel(Connection) of
         {ok, ChannelPid} ->
-            {ok, ConsumerPid} = fox_channel_sup:start_worker(ChannelPid, Queues, ConsumerModule, ConsumerArgs),
+            {ok, ConsumerPid} = fox_consumer_sup:start_worker(ChannelPid, Queues, ConsumerModule, ConsumerArgs),
             ChannelRef = erlang:monitor(process, ChannelPid),
             ConsumerRef = erlang:monitor(process, ConsumerPid),
             Sub2 = Sub#subscription{channel_pid = ChannelPid,
