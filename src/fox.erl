@@ -146,6 +146,7 @@ delete_queue(ChannelPid, Name, Params) ->
     QueueDelete = fox_utils:map_to_queue_delete(Params),
     QueueDelete2 = QueueDelete#'queue.delete'{queue = Name},
     case fox_utils:channel_call(ChannelPid, QueueDelete2) of
+        ok -> ok;
         #'queue.delete_ok'{} = Reply -> Reply;
         {error, Reason} -> {error, Reason}
     end.
