@@ -1,12 +1,4 @@
-*.beam
-.eunit
-deps
-logs
-ebin
-TAGS
-.rebar
 erl_crash.dump
 _build
 rebar.lock
 .idea
-*.iml
