@@ -39,6 +39,22 @@
 
 
 -type(sup_init_reply() ::
-        {ok, {{supervisor:strategy(), non_neg_integer(), non_neg_integer()},
+        {ok, {{supervisor:strategy(), non_neg_integer(), pos_integer()},
               [supervisor:child_spec()]}}
       | ignore).
+
+-type sup_name() ::
+    {local, Name :: atom()} |
+    {global, Name :: atom()} |
+    {via, Module :: module(), Name :: any()}.
+
+-type startchild_ret() ::
+    {ok, Child :: supervisor:child()} |
+    {ok, Child :: supervisor:child(), Info :: term()} |
+    {error, startchild_err()}.
+
+-type startchild_err() ::
+    already_present | {already_started, Child :: supervisor:child()} | term().
+
+-type child_description() ::
+    {supervisor:child_id(), supervisor:child(), supervisor:worker(), supervisor:modules()}.

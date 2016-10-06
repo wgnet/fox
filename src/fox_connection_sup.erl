@@ -26,7 +26,7 @@ init({ConnectionParams, OtherParams, PoolSize}) ->
     {ok, {{one_for_one, 10, 60}, Childs}}.
 
 
--spec create_channel(pid()) -> {ok, pid()} | {error, term()}.
+-spec create_channel(pid()) -> {ok, pid()} | {error, atom()}.
 create_channel(SupPid) ->
     case get_less_busy_connection(SupPid) of
         {ok, Worker} -> fox_connection_worker:create_channel(Worker);
@@ -66,7 +66,7 @@ stop(SupPid) ->
 
 %% Inner functions
 
--spec get_less_busy_connection(pid()) -> pid().
+-spec get_less_busy_connection(pid()) -> {ok, pid()} | {error, atom()}.
 get_less_busy_connection(SupPid) ->
     {ok, MaxChannels} = application:get_env(fox, max_channels_per_connection),
     {NumChannels, Pid} = hd(lists:sort(

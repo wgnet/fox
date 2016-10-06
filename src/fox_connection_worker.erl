@@ -39,7 +39,7 @@ start_link(ConnectionParams, OtherParams) ->
     gen_server:start_link(?MODULE, {ConnectionParams, OtherParams}, []).
 
 
--spec get_info(pid()) -> {num_channel, integer()} | no_connection.
+-spec get_info(pid()) -> {num_channels, integer()} | no_connection.
 get_info(Pid) ->
     case gen_server:call(Pid, get_connection, 15000) of
         undefined -> no_connection;

@@ -69,7 +69,7 @@ stop_pool(PoolName) ->
     end.
 
 
--spec create_channel(atom()) -> {ok, pid()} | {error, term()}.
+-spec create_channel(atom()) -> {ok, pid()} | {error, atom()}.
 create_channel(PoolName) ->
     ChildId = {fox_connection_sup, PoolName},
     case find_child(ChildId) of
@@ -79,7 +79,7 @@ create_channel(PoolName) ->
     end.
 
 
--spec get_publish_pool(atom()) -> {ok, pid()} | {error, term()}.
+-spec get_publish_pool(atom()) -> {ok, pid()} | {error, atom()}.
 get_publish_pool(PoolName) ->
     ChildId = {fox_publish_channels_pool, PoolName},
     case find_child(ChildId) of
@@ -88,7 +88,7 @@ get_publish_pool(PoolName) ->
     end.
 
 
--spec get_publish_channel(atom()) -> {ok, pid()} | {error, term()}.
+-spec get_publish_channel(atom()) -> {ok, pid()} | {error, atom()}.
 get_publish_channel(PoolName) ->
     case get_publish_pool(PoolName) of
         {ok, PoolPid} -> fox_publish_channels_pool:get_channel(PoolPid);
@@ -118,7 +118,7 @@ unsubscribe(PoolName, Ref) ->
 
 %% Inner functions
 
--spec find_child(term()) -> {ok, tuple()} | {error, not_found}.
+-spec find_child(supervisor:child_id()) -> {ok, child_description()} | {error, not_found}.
 find_child(ChildId) ->
     Res = lists:filter(fun({Id, _, _, _}) -> Id =:= ChildId end,
                        supervisor:which_children(?MODULE)),

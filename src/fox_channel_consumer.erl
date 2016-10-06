@@ -1,11 +1,16 @@
 -module(fox_channel_consumer).
 -behavior(gen_server).
 
--export([start_link/4, stop/1, behaviour_info/1]).
+-export([start_link/4, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
+
+-callback init(Channel :: pid(), Args :: list()) -> {ok, State :: term()}.
+-callback handle(Msg :: term(), Channel :: pid(), State :: term()) -> {ok, State :: term()}.
+-callback terminate(Channel :: pid(), State :: term()) -> ok.
+
 
 -record(state, {channel_pid :: pid(),
                 consumer :: module(),
@@ -26,15 +31,6 @@ start_link(ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
 -spec stop(pid()) -> ok.
 stop(Pid) ->
     gen_server:call(Pid, stop).
-
-
--spec behaviour_info(term()) -> term().
-behaviour_info(callbacks) ->
-    [{init, 2},
-     {handle, 3},
-     {terminate, 2}];
-behaviour_info(_) ->
-    undefined.
 
 
 %%% gen_server API

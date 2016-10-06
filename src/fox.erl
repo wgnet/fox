@@ -47,7 +47,7 @@ create_connection_pool(PoolName, Params, PoolSize) when is_map(Params) ->
     create_connection_pool(PoolName, fox_utils:map_to_params_network(Params), Params, PoolSize).
 
 
--spec create_connection_pool(pool_name(), #amqp_params_network{}, integer(), map()) -> ok.
+-spec create_connection_pool(pool_name(), #amqp_params_network{}, map(), integer()) -> ok.
 create_connection_pool(PoolName, #amqp_params_network{} = ConnectionParams, OtherParams, PoolSize) ->
     true = fox_utils:validate_params_network_types(ConnectionParams),
     PoolName2 = fox_utils:name_to_atom(PoolName),
@@ -228,7 +228,7 @@ qos(PoolOrChannel, Params) ->
     end.
 
 
--spec(test_run() -> ok).
+-spec test_run() -> ok.
 test_run() ->
     application:ensure_all_started(fox),
 

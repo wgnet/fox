@@ -12,7 +12,7 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 
--spec start_worker(pid(), [subscribe_queue()], module(), list()) -> {ok | pid()}.
+-spec start_worker(pid(), [subscribe_queue()], module(), list()) -> startchild_ret().
 start_worker(ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
     supervisor:start_child(?MODULE, [ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs]).
 
