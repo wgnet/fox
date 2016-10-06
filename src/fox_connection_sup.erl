@@ -28,7 +28,7 @@ init({ConnectionParams, OtherParams, PoolSize}) ->
 
 -spec create_channel(pid()) -> {ok, pid()} | {error, term()}.
 create_channel(SupPid) ->
-    case get_less_busy_worker(SupPid) of
+    case get_less_busy_connection(SupPid) of
         {ok, Worker} -> fox_connection_worker:create_channel(Worker);
         {error, Reason} -> {error, Reason}
     end.
@@ -36,7 +36,7 @@ create_channel(SupPid) ->
 
 -spec subscribe(pid(), [subscribe_queue()], module(), list()) -> {ok, reference()} | {error, term()}.
 subscribe(SupPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
-    case get_less_busy_worker(SupPid) of
+    case get_less_busy_connection(SupPid) of
     {ok, Worker} ->
             fox_connection_worker:subscribe(Worker, Queues, ConsumerModule, ConsumerModuleArgs);
         {error, Reason} -> {error, Reason}
@@ -66,8 +66,8 @@ stop(SupPid) ->
 
 %% Inner functions
 
--spec get_less_busy_worker(pid()) -> pid().
-get_less_busy_worker(SupPid) ->
+-spec get_less_busy_connection(pid()) -> pid().
+get_less_busy_connection(SupPid) ->
     {ok, MaxChannels} = application:get_env(fox, max_channels_per_connection),
     {NumChannels, Pid} = hd(lists:sort(
                               lists:map(

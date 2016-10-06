@@ -26,11 +26,9 @@
 %%% module API
 
 -spec name_to_atom(pool_name()) -> atom().
-name_to_atom(Name) when is_binary(Name) ->
-    name_to_atom(erlang:binary_to_atom(Name, utf8));
-name_to_atom(Name) when is_list(Name) ->
-    name_to_atom(list_to_atom(Name));
-name_to_atom(Name) -> Name.
+name_to_atom(Name) when is_binary(Name) -> erlang:binary_to_atom(Name, utf8);
+name_to_atom(Name) when is_list(Name) -> list_to_atom(Name);
+name_to_atom(Name) when is_atom(Name) -> Name.
 
 
 -spec map_to_params_network(map()) -> #amqp_params_network{}.
