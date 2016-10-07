@@ -12,9 +12,7 @@
 -record(subscription, {
           ref :: reference(),
           channel_pid :: pid(),
-          channel_ref :: reference(),
           consumer_pid :: pid(),
-          consumer_ref :: reference(),
           consumer_module :: module(),
           consumer_args :: list(),
           queues :: [subscribe_queue()]
@@ -28,7 +26,7 @@
           connect_callback :: fox_callback(),
           disconnect_callback :: fox_callback(),
           reconnect_attempt = 0 :: non_neg_integer(),
-          subscriptions_ets :: ets:tid()
+          subscriptions_ets :: ets:tid() % keep subscriptions info to create them again after disconnect-reconnect
          }).
 
 
@@ -96,13 +94,13 @@ handle_call(create_channel, _From, #state{connection = Connection} = State) ->
 handle_call({subscribe, Queues, ConsumerModule, ConsumerArgs}, _From,
             #state{connection = Connection, subscriptions_ets = TID} = State) ->
     Ref = make_ref(),
-    Sub = #subscription{ref = Ref,
+    Sub = #subscription{ref = Ref, % TODO create this record in subscribe() function
                         consumer_module = ConsumerModule,
                         consumer_args = ConsumerArgs,
                         queues = Queues
                        },
     Reply = case Connection of
-                undefined ->
+                undefined -> % will start subscription later
                     ets:insert(TID, Sub),
                     {ok, Ref};
                 _Pid ->
@@ -187,33 +185,6 @@ handle_info({'DOWN', Ref, process, Connection, Reason},
     fox_utils:call_callback(Callback),
     {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
-handle_info({'DOWN', Ref, process, Pid, Reason}, #state{connection = Connection, subscriptions_ets = TID} = State) ->
-    erlang:demonitor(Ref, [flush]),
-
-    MS = ets:fun2ms(fun(#subscription{channel_pid = ChPid, consumer_pid = CoPid} = Sub)
-                          when ChPid == Pid orelse CoPid == Pid ->
-                            Sub
-                    end),
-    case ets:select(TID, MS) of
-        [] -> do_nothing;
-        [Sub] ->
-            error_or_info(Reason,
-                          "fox_connection_worker, channel or consumer ~p is DOWN: ~p",
-                          [Pid, Reason]),
-            close_subscription(Sub),
-            case Connection of
-                undefined -> do_nothing;
-                _Pid ->
-                    try
-                        {ok, Sub2} = do_subscription(Connection, Sub),
-                        ets:insert(TID, Sub2)
-                    catch
-                        E:R -> error_logger:error_msg("do_subscription~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
-                    end
-            end
-    end,
-    {noreply, State};
-
 
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
@@ -237,12 +208,7 @@ do_subscription(Connection, #subscription{consumer_module = ConsumerModule, cons
     case amqp_connection:open_channel(Connection) of
         {ok, ChannelPid} ->
             {ok, ConsumerPid} = fox_consumer_sup:start_worker(ChannelPid, Queues, ConsumerModule, ConsumerArgs),
-            ChannelRef = erlang:monitor(process, ChannelPid),
-            ConsumerRef = erlang:monitor(process, ConsumerPid),
-            Sub2 = Sub#subscription{channel_pid = ChannelPid,
-                                    channel_ref = ChannelRef,
-                                    consumer_pid = ConsumerPid,
-                                    consumer_ref = ConsumerRef},
+            Sub2 = Sub#subscription{channel_pid = ChannelPid, consumer_pid = ConsumerPid},
             {ok, Sub2};
         {error, Reason} ->
             {error, Reason}
@@ -250,17 +216,12 @@ do_subscription(Connection, #subscription{consumer_module = ConsumerModule, cons
 
 
 -spec close_subscription(#subscription{}) -> #subscription{}.
-close_subscription(#subscription{channel_pid = undefined, channel_ref = undefined,
-                                 consumer_pid = undefined, consumer_ref = undefined} = Sub) ->
+close_subscription(#subscription{channel_pid = undefined, consumer_pid = undefined} = Sub) ->
     Sub;
-close_subscription(#subscription{channel_pid = ChannelPid, channel_ref = ChannelRef,
-                                 consumer_pid = ConsumerPid, consumer_ref = ConsumerRef} = Sub) ->
-    erlang:demonitor(ChannelRef, [flush]),
-    erlang:demonitor(ConsumerRef, [flush]),
+close_subscription(#subscription{channel_pid = ChannelPid, consumer_pid = ConsumerPid } = Sub) ->
     fox_utils:close_consumer(ConsumerPid),
     fox_utils:close_channel(ChannelPid),
-    Sub#subscription{channel_pid = undefined, channel_ref = undefined,
-                     consumer_pid = undefined, consumer_ref = undefined}.
+    Sub#subscription{channel_pid = undefined, consumer_pid = undefined}.
 
 
 error_or_info(normal, ErrMsg, Params) ->

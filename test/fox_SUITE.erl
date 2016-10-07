@@ -17,7 +17,6 @@ all() ->
     ,publish_pool_test
     ,subscribe_test
     ,subscribe_state_test
-    ,consumer_down_test
     ].
 
 
@@ -173,8 +172,8 @@ subscribe_state_test(_Config) ->
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:log("EtsData: ~p", [EtsData]),
-    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, [], _}], EtsData),
-    ?assertMatch([{subscription, Ref, _, _, _, _, sample_channel_consumer, [], _}], ets:lookup(TID, Ref)),
+    ?assertMatch([{subscription, Ref, _, _, sample_channel_consumer, [], _}], EtsData),
+    ?assertMatch([{subscription, Ref, _, _, sample_channel_consumer, [], _}], ets:lookup(TID, Ref)),
 
     %% Unsubscribe
     fox:unsubscribe(subscribe_state_test, Ref),
@@ -182,98 +181,6 @@ subscribe_state_test(_Config) ->
     timer:sleep(200),
 
     ?assertEqual([], ets:tab2list(TID)),
-    ok.
-
-
--spec consumer_down_test(list()) -> ok.
-consumer_down_test(_Config) ->
-    T = ets:new(subscribe_test_ets, [public, named_table]),
-    SortF = fun(I1, I2) -> element(1, I1) < element(1, I2) end,
-
-    {ok, Ref} = fox:subscribe(consumer_down_test,  <<"my_queue">>, subscribe_test, "args2"),
-    timer:sleep(200),
-    Res1 = lists:sort(SortF, ets:tab2list(T)),
-    ?assertMatch([{1, init, "args2"}], Res1),
-
-    {ok, PChannel} = fox:create_channel(consumer_down_test),
-    fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
-    timer:sleep(200),
-    Res2 = lists:sort(SortF, ets:tab2list(T)),
-    ct:log("Res2: ~p", [Res2]),
-    ?assertMatch([
-                  {1, init, "args2"},
-                  {2, handle_basic_deliver, <<"Hi there!">>}
-                 ],
-                 Res2),
-
-
-    ConnectionWorkerPid = get_connection_worker(consumer_down_test),
-    State = sys:get_state(ConnectionWorkerPid),
-    #state{subscriptions_ets = TID} = State,
-
-    EtsData = lists:sort(ets:tab2list(TID)),
-    ct:log("EtsData: ~p", [EtsData]),
-    ?assertMatch([{subscription, Ref, _, _, _, _, subscribe_test, "args2", [<<"my_queue">>]}], EtsData),
-    [{subscription, Ref, ChannelPid, _, ConsumerPid, _, subscribe_test, "args2", [<<"my_queue">>]}] = ets:lookup(TID, Ref),
-
-    fox_channel_consumer:stop(ConsumerPid),
-    timer:sleep(200),
-
-    [{subscription, Ref, ChannelPid2, _, ConsumerPid2, _, subscribe_test, "args2", [<<"my_queue">>]}] = ets:lookup(TID, Ref),
-
-    ?assertNotEqual(ChannelPid, ChannelPid2),
-    ?assert(not erlang:is_process_alive(ChannelPid)),
-    ?assert(erlang:is_process_alive(ChannelPid2)),
-    ?assertNotEqual(ConsumerPid, ConsumerPid2),
-    ?assert(not erlang:is_process_alive(ConsumerPid)),
-    ?assert(erlang:is_process_alive(ConsumerPid2)),
-
-    %% callback is still working
-    Res3 = lists:sort(SortF, ets:tab2list(T)),
-    ct:log("Res3: ~p", [Res3]),
-    ?assertMatch([
-                  {1, init, "args2"},
-                  {2, handle_basic_deliver, <<"Hi there!">>},
-                  {3, terminate},
-                  {4, init, "args2"}
-                 ],
-                 Res3),
-
-    fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"alloha">>),
-    timer:sleep(200),
-    Res4 = lists:sort(SortF, ets:tab2list(T)),
-    ct:log("Res4: ~p", [Res4]),
-    ?assertMatch([
-                  {1, init, "args2"},
-                  {2, handle_basic_deliver, <<"Hi there!">>},
-                  {3, terminate},
-                  {4, init, "args2"},
-                  {5, handle_basic_deliver, <<"alloha">>}
-                 ],
-                 Res4),
-
-    %% unsubscribe
-    fox:unsubscribe(consumer_down_test, Ref),
-    timer:sleep(200),
-    ?assert(not erlang:is_process_alive(ChannelPid2)),
-    ?assert(not erlang:is_process_alive(ConsumerPid2)),
-
-    ?assertEqual([], ets:tab2list(TID)),
-
-    Res5 = lists:sort(SortF, ets:tab2list(T)),
-    ct:log("Res5: ~p", [Res5]),
-    ?assertMatch([
-                  {1, init, "args2"},
-                  {2, handle_basic_deliver, <<"Hi there!">>},
-                  {3, terminate},
-                  {4, init, "args2"},
-                  {5, handle_basic_deliver, <<"alloha">>},
-                  {6, terminate}
-                 ],
-                 Res5),
-
-    amqp_channel:close(PChannel),
-    ets:delete(T),
     ok.
 
 
