@@ -171,7 +171,7 @@ terminate(ChannelPid, State) ->
 ```
 
 Here is a sample callback module:
-[sample_channel_consumer](src/sample_channel_consumer.erl)
+[sample_subscription_callback](src/sample_subscription_callback.erl)
 
 
 **fox:unsubscribe(PoolName, ChannelPid)** unsubscribes and closes channel.

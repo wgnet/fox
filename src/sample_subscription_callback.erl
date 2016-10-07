@@ -1,4 +1,4 @@
--module(sample_channel_consumer).
+-module(sample_subscription_callback).
 -behaviour(fox_channel_consumer).
 
 -export([init/2, handle/3, terminate/2]).
@@ -12,7 +12,7 @@
 
 -spec init(pid(), list()) -> {ok, state()}.
 init(ChannelPid, Args) ->
-    error_logger:info_msg("sample_channel_consumer:init channel:~p args:~p", [ChannelPid, Args]),
+    error_logger:info_msg("sample_subscription_callback:init channel:~p args:~p", [ChannelPid, Args]),
 
     Exchange = <<"my_exchange">>,
     Queue1 = <<"my_queue">>,
@@ -34,22 +34,22 @@ init(ChannelPid, Args) ->
 
 -spec handle(term(), pid(), state()) -> {ok, state()}.
 handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, ChannelPid, State) ->
-    error_logger:info_msg("sample_channel_consumer:handle basic.deliver, Payload:~p", [Payload]),
+    error_logger:info_msg("sample_subscription_callback:handle basic.deliver, Payload:~p", [Payload]),
     amqp_channel:cast(ChannelPid, #'basic.ack'{delivery_tag = Tag}),
     {ok, State};
 
 handle(#'basic.cancel'{} = Data, _ChannelPid, State) ->
-    error_logger:info_msg("sample_channel_consumer:handle basic.cancel, Data:~p", [Data]),
+    error_logger:info_msg("sample_subscription_callback:handle basic.cancel, Data:~p", [Data]),
     {ok, State};
 
 handle(Data, _ChannelPid, State) ->
-    error_logger:error_msg("sample_channel_consumer:handle, unknown data:~p", [Data]),
+    error_logger:error_msg("sample_subscription_callback:handle, unknown data:~p", [Data]),
     {ok, State}.
 
 
 -spec terminate(pid(), state()) -> ok.
 terminate(ChannelPid, State) ->
-    error_logger:info_msg("sample_channel_consumer:terminate channel:~p, state:~p", [ChannelPid, State]),
+    error_logger:info_msg("sample_subscription_callback:terminate channel:~p, state:~p", [ChannelPid, State]),
     {Exchange, Bindings} = State,
     lists:foreach(fun({Queue, RoutingKey}) ->
                           fox:unbind_queue(ChannelPid, Queue, Exchange, RoutingKey),

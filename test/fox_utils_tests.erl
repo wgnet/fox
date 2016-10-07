@@ -61,7 +61,7 @@ params_network_to_str_test() ->
 
 
 validate_consumer_behaviour_test() ->
-    ?assertEqual(true, fox_utils:validate_consumer_behaviour(sample_channel_consumer)),
+    ?assertEqual(true, fox_utils:validate_consumer_behaviour(sample_subscription_callback)),
     ?assertThrow({invalid_consumer_module, {should_be_exported, _}},
                  fox_utils:validate_consumer_behaviour(fox)),
     ok.

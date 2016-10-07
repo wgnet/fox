@@ -158,10 +158,13 @@ subscribe_test(_Config) ->
 
 -spec subscribe_state_test(list()) -> ok.
 subscribe_state_test(_Config) ->
-    {ok, Ref} = fox:subscribe(subscribe_state_test,
-                              [<<"my_queue">>,
-                               #'basic.consume'{queue = <<"other_queue">>}],
-                              sample_channel_consumer, []),
+    {ok, Ref} = fox:subscribe(
+        subscribe_state_test,
+        [
+            <<"my_queue">>,
+            #'basic.consume'{queue = <<"other_queue">>}
+        ],
+        sample_subscription_callback),
 
     ct:log("Ref:~p", [Ref]),
 
@@ -172,8 +175,18 @@ subscribe_state_test(_Config) ->
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:log("EtsData: ~p", [EtsData]),
-    ?assertMatch([#subscription{ref = Ref, consumer_module = sample_channel_consumer}], EtsData),
-    ?assertMatch([#subscription{ref = Ref, consumer_module = sample_channel_consumer}], ets:lookup(TID, Ref)),
+    ?assertMatch([
+        #subscription{
+            ref = Ref,
+            consumer_module = sample_subscription_callback
+        }
+    ], EtsData),
+    ?assertMatch([
+        #subscription{
+            ref = Ref,
+            consumer_module = sample_subscription_callback
+        }
+    ], ets:lookup(TID, Ref)),
 
     %% Unsubscribe
     fox:unsubscribe(subscribe_state_test, Ref),

@@ -252,7 +252,7 @@ test_run() ->
 
     Q1 = #'basic.consume'{queue = <<"my_queue">>},
     Q2 = <<"other_queue">>,
-    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_channel_consumer),
+    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_subscription_callback),
 
     timer:sleep(500),
 
