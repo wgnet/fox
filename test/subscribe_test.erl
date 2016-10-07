@@ -1,5 +1,5 @@
 -module(subscribe_test).
--behaviour(fox_channel_consumer).
+-behaviour(fox_consume_router).
 
 -export([init/2, handle/3, terminate/2]).
 

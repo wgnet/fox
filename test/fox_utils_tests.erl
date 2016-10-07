@@ -60,13 +60,6 @@ params_network_to_str_test() ->
     ok.
 
 
-validate_consumer_behaviour_test() ->
-    ?assertEqual(true, fox_utils:validate_consumer_behaviour(sample_subscription_callback)),
-    ?assertThrow({invalid_consumer_module, {should_be_exported, _}},
-                 fox_utils:validate_consumer_behaviour(fox)),
-    ok.
-
-
 map_to_exchange_declare_test() ->
     P1 = #{aaa => 5, bbb => 42},
     ED1 = #'exchange.declare'{

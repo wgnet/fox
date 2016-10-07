@@ -189,10 +189,10 @@ code_change(_OldVersion, State, _Extra) ->
 -spec do_subscription(pid(), #subscription{}) -> {ok, #subscription{}} | {error, term()}.
 do_subscription(Connection, Sub) ->
     case amqp_connection:open_channel(Connection) of
-        {ok, ChannelPid} ->
-            #subscription{queues = Queues, consumer_module = ConsumerModule, consumer_args = ConsumerArgs} = Sub,
-            {ok, ConsumerPid} = fox_consumer_sup:start_consumer(ChannelPid, Queues, ConsumerModule, ConsumerArgs),
-            {ok, Sub#subscription{channel_pid = ChannelPid, consumer_pid = ConsumerPid}};
+        {ok, Channel} ->
+            Sub2 = Sub#subscription{channel_pid = Channel},
+            {ok, Consumer} = fox_consumer_sup:start_consumer(Sub2),
+            {ok, Sub2#subscription{consumer_pid = Consumer}};
         {error, Reason} ->
             {error, Reason}
     end.

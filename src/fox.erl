@@ -79,7 +79,6 @@ subscribe(PoolName, Queue, ConsumerModule, ConsumerArgs) when not is_list(Queue)
     subscribe(PoolName, [Queue], ConsumerModule, ConsumerArgs);
 
 subscribe(PoolName, Queues, ConsumerModule, ConsumerArgs) ->
-    true = fox_utils:validate_consumer_behaviour(ConsumerModule),
     PoolName2 = fox_utils:name_to_atom(PoolName),
     Sub = #subscription{
         ref = make_ref(),
@@ -252,7 +251,7 @@ test_run() ->
 
     Q1 = #'basic.consume'{queue = <<"my_queue">>},
     Q2 = <<"other_queue">>,
-    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_subscription_callback),
+    {ok, Ref} = subscribe("test_pool", [Q1, Q2], sample_subscription_callback),
 
     timer:sleep(500),
 
@@ -262,10 +261,10 @@ test_run() ->
     publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 3">>),
     publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
 
-    %% timer:sleep(1000),
+    timer:sleep(1000),
 
-    %% unsubscribe("test_pool", Ref),
-    %% amqp_channel:close(PChannel),
-    %% close_connection_pool("test_pool"),
+    unsubscribe("test_pool", Ref),
+    amqp_channel:close(PChannel),
+    close_connection_pool("test_pool"),
 
     ok.

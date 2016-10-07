@@ -4,7 +4,6 @@
          map_to_params_network/1,
          params_network_to_str/1,
          validate_params_network_types/1,
-         validate_consumer_behaviour/1,
          map_to_exchange_declare/1,
          map_to_exchange_delete/1,
          map_to_queue_declare/1,
@@ -92,22 +91,6 @@ validate_params_network_types(
         not is_list(ClientProperties) -> throw({invalid_amqp_params_network, "client_properties should be list"});
         not is_list(SocketOptions) -> throw({invalid_amqp_params_network, "socket_options should be list"});
         true -> true
-    end.
-
-
--spec validate_consumer_behaviour(module()) -> true | no_return().
-validate_consumer_behaviour(Module) ->
-    case code:is_loaded(Module) of
-        {file, _} -> do_nothing;
-        false -> code:load_file(Module)
-    end,
-    Callbacks = fox_channel_consumer:behaviour_info(callbacks),
-    NotExported = lists:filter(fun({Fun, Arity}) ->
-                                       not erlang:function_exported(Module, Fun, Arity)
-                               end, Callbacks),
-    case NotExported of
-        [] -> true;
-        _ -> throw({invalid_consumer_module, {should_be_exported, NotExported}})
     end.
 
 
@@ -247,7 +230,7 @@ close_channel(Pid) ->
 -spec close_consumer(pid()) -> ok.
 close_consumer(Pid) ->
     try
-        fox_channel_consumer:stop(Pid), ok
+        fox_consume_router:stop(Pid), ok
     catch
         exit:{noproc, _} -> ok; % consumer may already be closed
         E:R -> error_logger:error_msg("can't close consumer~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
