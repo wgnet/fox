@@ -172,8 +172,8 @@ subscribe_state_test(_Config) ->
 
     EtsData = lists:sort(ets:tab2list(TID)),
     ct:log("EtsData: ~p", [EtsData]),
-    ?assertMatch([{subscription, Ref, _, _, sample_channel_consumer, [], _}], EtsData),
-    ?assertMatch([{subscription, Ref, _, _, sample_channel_consumer, [], _}], ets:lookup(TID, Ref)),
+    ?assertMatch([#subscription{ref = Ref, consumer_module = sample_channel_consumer}], EtsData),
+    ?assertMatch([#subscription{ref = Ref, consumer_module = sample_channel_consumer}], ets:lookup(TID, Ref)),
 
     %% Unsubscribe
     fox:unsubscribe(subscribe_state_test, Ref),

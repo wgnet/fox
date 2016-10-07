@@ -75,13 +75,19 @@ subscribe(PoolName, Queues, ConsumerModule) ->
 
 -spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module(), list()) ->
                        {ok, reference()} | {error, term()}.
-subscribe(PoolName, Queue, ConsumerModule, ConsumerModuleArgs) when not is_list(Queue) ->
-    subscribe(PoolName, [Queue], ConsumerModule, ConsumerModuleArgs);
+subscribe(PoolName, Queue, ConsumerModule, ConsumerArgs) when not is_list(Queue) ->
+    subscribe(PoolName, [Queue], ConsumerModule, ConsumerArgs);
 
-subscribe(PoolName, Queues, ConsumerModule, ConsumerModuleArgs) ->
+subscribe(PoolName, Queues, ConsumerModule, ConsumerArgs) ->
     true = fox_utils:validate_consumer_behaviour(ConsumerModule),
     PoolName2 = fox_utils:name_to_atom(PoolName),
-    fox_connection_pool_sup:subscribe(PoolName2, Queues, ConsumerModule, ConsumerModuleArgs).
+    Sub = #subscription{
+        ref = make_ref(),
+        queues = Queues,
+        consumer_module = ConsumerModule,
+        consumer_args = ConsumerArgs
+    },
+    fox_connection_pool_sup:subscribe(PoolName2, Sub).
 
 
 -spec unsubscribe(pool_name(), reference()) -> ok | {error, term()}.

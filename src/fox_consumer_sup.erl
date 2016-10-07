@@ -1,7 +1,7 @@
 -module(fox_consumer_sup).
 -behaviour(supervisor).
 
--export([start_link/0, start_worker/4, init/1]).
+-export([start_link/0, start_consumer/4, init/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -12,8 +12,8 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 
--spec start_worker(pid(), [subscribe_queue()], module(), list()) -> startchild_ret().
-start_worker(ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
+-spec start_consumer(pid(), [subscribe_queue()], module(), list()) -> startchild_ret().
+start_consumer(ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
     supervisor:start_child(?MODULE, [ChannelPid, Queues, ConsumerModule, ConsumerModuleArgs]).
 
 

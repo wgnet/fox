@@ -1,7 +1,7 @@
 -module(fox_connection_sup).
 -behaviour(supervisor).
 
--export([start_link/3, init/1, create_channel/1, subscribe/4, unsubscribe/2, stop/1]).
+-export([start_link/3, init/1, create_channel/1, subscribe/2, unsubscribe/2, stop/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -34,11 +34,11 @@ create_channel(SupPid) ->
     end.
 
 
--spec subscribe(pid(), [subscribe_queue()], module(), list()) -> {ok, reference()} | {error, term()}.
-subscribe(SupPid, Queues, ConsumerModule, ConsumerModuleArgs) ->
+-spec subscribe(pid(), #subscription{}) -> {ok, reference()} | {error, term()}.
+subscribe(SupPid, Sub) ->
     case get_less_busy_connection(SupPid) of
     {ok, Worker} ->
-            fox_connection_worker:subscribe(Worker, Queues, ConsumerModule, ConsumerModuleArgs);
+            fox_connection_worker:subscribe(Worker, Sub);
         {error, Reason} -> {error, Reason}
     end.
 

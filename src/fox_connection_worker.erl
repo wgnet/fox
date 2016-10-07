@@ -1,33 +1,22 @@
 -module(fox_connection_worker).
 -behavior(gen_server).
 
--export([start_link/2, get_info/1, create_channel/1, subscribe/4, unsubscribe/2, stop/1]).
+-export([start_link/2, get_info/1, create_channel/1, subscribe/2, unsubscribe/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
-
--record(subscription, {
-          ref :: reference(),
-          channel_pid :: pid(),
-          consumer_pid :: pid(),
-          consumer_module :: module(),
-          consumer_args :: list(),
-          queues :: [subscribe_queue()]
-         }).
-
-
 -record(state, {
-          connection :: pid(),
-          connection_ref :: reference(),
-          params_network :: #amqp_params_network{},
-          connect_callback :: fox_callback(),
-          disconnect_callback :: fox_callback(),
-          reconnect_attempt = 0 :: non_neg_integer(),
-          subscriptions_ets :: ets:tid() % keep subscriptions info to create them again after disconnect-reconnect
-         }).
+    connection :: pid(),
+    connection_ref :: reference(),
+    params_network :: #amqp_params_network{},
+    connect_callback :: fox_callback(),
+    disconnect_callback :: fox_callback(),
+    reconnect_attempt = 0 :: non_neg_integer(),
+    subscriptions_ets :: ets:tid() % keep subscriptions info to create them again after disconnect-reconnect
+}).
 
 
 %%% module API
@@ -50,9 +39,9 @@ create_channel(Pid) ->
     gen_server:call(Pid, create_channel).
 
 
--spec subscribe(pid(), [subscribe_queue()], module(), list()) -> {ok, reference()} | {error, term()}.
-subscribe(Pid, Queues, ConsumerModule, ConsumerArgs) ->
-    gen_server:call(Pid, {subscribe, Queues, ConsumerModule, ConsumerArgs}).
+-spec subscribe(pid(), #subscription{}) -> {ok, reference()} | {error, term()}.
+subscribe(Pid, Sub) ->
+    gen_server:call(Pid, Sub).
 
 
 -spec unsubscribe(pid(), reference()) -> ok | {error, term()}.
@@ -91,14 +80,8 @@ handle_call(create_channel, _From, #state{connection = Connection} = State) ->
             end,
     {reply, Reply, State};
 
-handle_call({subscribe, Queues, ConsumerModule, ConsumerArgs}, _From,
+handle_call(#subscription{ref = Ref} = Sub, _From,
             #state{connection = Connection, subscriptions_ets = TID} = State) ->
-    Ref = make_ref(),
-    Sub = #subscription{ref = Ref, % TODO create this record in subscribe() function
-                        consumer_module = ConsumerModule,
-                        consumer_args = ConsumerArgs,
-                        queues = Queues
-                       },
     Reply = case Connection of
                 undefined -> % will start subscription later
                     ets:insert(TID, Sub),
@@ -204,12 +187,12 @@ code_change(_OldVersion, State, _Extra) ->
 %% inner functions
 
 -spec do_subscription(pid(), #subscription{}) -> {ok, #subscription{}} | {error, term()}.
-do_subscription(Connection, #subscription{consumer_module = ConsumerModule, consumer_args = ConsumerArgs, queues = Queues} = Sub) ->
+do_subscription(Connection, Sub) ->
     case amqp_connection:open_channel(Connection) of
         {ok, ChannelPid} ->
-            {ok, ConsumerPid} = fox_consumer_sup:start_worker(ChannelPid, Queues, ConsumerModule, ConsumerArgs),
-            Sub2 = Sub#subscription{channel_pid = ChannelPid, consumer_pid = ConsumerPid},
-            {ok, Sub2};
+            #subscription{queues = Queues, consumer_module = ConsumerModule, consumer_args = ConsumerArgs} = Sub,
+            {ok, ConsumerPid} = fox_consumer_sup:start_consumer(ChannelPid, Queues, ConsumerModule, ConsumerArgs),
+            {ok, Sub#subscription{channel_pid = ChannelPid, consumer_pid = ConsumerPid}};
         {error, Reason} ->
             {error, Reason}
     end.
