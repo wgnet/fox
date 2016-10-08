@@ -253,18 +253,18 @@ test_run() ->
     Q2 = <<"other_queue">>,
     {ok, Ref} = subscribe("test_pool", [Q1, Q2], sample_subscription_callback),
 
-    timer:sleep(500),
-
-    {ok, PChannel} = create_channel("test_pool"),
-    publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
-    publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
-    publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 3">>),
-    publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
-
-    timer:sleep(1000),
-
-    unsubscribe("test_pool", Ref),
-    amqp_channel:close(PChannel),
-    close_connection_pool("test_pool"),
+%%    timer:sleep(500),
+%%
+%%    {ok, PChannel} = create_channel("test_pool"),
+%%    publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
+%%    publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
+%%    publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 3">>),
+%%    publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
+%%
+%%    timer:sleep(1000),
+%%
+%%    unsubscribe("test_pool", Ref),
+%%    amqp_channel:close(PChannel),
+%%    close_connection_pool("test_pool"),
 
     ok.
