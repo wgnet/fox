@@ -189,20 +189,20 @@ do_subscription(Connection, Sub) ->
     case amqp_connection:open_channel(Connection) of
         {ok, Channel} ->
             Sub2 = Sub#subscription{channel_pid = Channel},
-            {ok, Consumer} = fox_subs_sup:start_consumer(Sub2),
-            {ok, Sub2#subscription{consumer_pid = Consumer}};
+            {ok, Router} = fox_subs_sup:start_router(Sub2),
+            {ok, Sub2#subscription{subs_pid = Router}};
         {error, Reason} ->
             {error, Reason}
     end.
 
 
 -spec close_subscription(#subscription{}) -> #subscription{}.
-close_subscription(#subscription{channel_pid = undefined, consumer_pid = undefined} = Sub) ->
+close_subscription(#subscription{channel_pid = undefined, subs_pid = undefined} = Sub) ->
     Sub;
-close_subscription(#subscription{channel_pid = ChannelPid, consumer_pid = ConsumerPid } = Sub) ->
-    fox_utils:close_consumer(ConsumerPid),
+close_subscription(#subscription{channel_pid = ChannelPid, subs_pid = Router } = Sub) ->
+    fox_utils:close_subs(Router),
     fox_utils:close_channel(ChannelPid),
-    Sub#subscription{channel_pid = undefined, consumer_pid = undefined}.
+    Sub#subscription{channel_pid = undefined, subs_pid = undefined}.
 
 
 error_or_info(normal, ErrMsg, Params) ->

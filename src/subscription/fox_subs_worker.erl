@@ -14,16 +14,16 @@
 
 -record(state, {
     channel :: pid(),
-    consumer :: module(),
-    consumer_state :: term()
+    callback :: module(),
+    callback_state :: term()
 }).
 
 
 %%% module API
 
 -spec start_link(pid(), module(), list()) -> gs_start_link_reply().
-start_link(Channel, ConsumerModule, ConsumerArgs) ->
-    gen_server:start_link(?MODULE, {Channel, ConsumerModule, ConsumerArgs}, []).
+start_link(Channel, SubsModule, SubsArgs) ->
+    gen_server:start_link(?MODULE, {Channel, SubsModule, SubsArgs}, []).
 
 
 -spec stop(pid()) -> ok.
@@ -34,14 +34,14 @@ stop(Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init({Channel, ConsumerModule, ConsumerArgs}) ->
-    {ok, CState} = ConsumerModule:init(Channel, ConsumerArgs),
-    {ok, #state{channel = Channel, consumer = ConsumerModule, consumer_state = CState}}.
+init({Channel, SubsModule, SubsArgs}) ->
+    {ok, CState} = SubsModule:init(Channel, SubsArgs),
+    {ok, #state{channel = Channel, callback = SubsModule, callback_state = CState}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call(stop, _From, #state{channel = Channel, consumer = ConsumerModule, consumer_state = CState} = State) ->
-    ConsumerModule:terminate(Channel, CState),
+handle_call(stop, _From, #state{channel = Channel, callback = SubsModule, callback_state = CState} = State) ->
+    SubsModule:terminate(Channel, CState),
     {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
@@ -56,9 +56,9 @@ handle_cast(Any, State) ->
 
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
-handle_info(Msg, #state{channel = Channel, consumer = Module, consumer_state = CState} = State) ->
+handle_info(Msg, #state{channel = Channel, callback = Module, callback_state = CState} = State) ->
     {ok, CState2} = Module:handle(Msg, Channel, CState),
-    {noreply, State#state{consumer_state = CState2}};
+    {noreply, State#state{callback_state = CState2}};
 
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),

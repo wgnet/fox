@@ -69,22 +69,22 @@ create_channel(PoolName) ->
 
 -spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module()) ->
                        {ok, reference()} | {error, term()}.
-subscribe(PoolName, Queues, ConsumerModule) ->
-    subscribe(PoolName, Queues, ConsumerModule, []).
+subscribe(PoolName, Queues, SubsModule) ->
+    subscribe(PoolName, Queues, SubsModule, []).
 
 
 -spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module(), list()) ->
                        {ok, reference()} | {error, term()}.
-subscribe(PoolName, Queue, ConsumerModule, ConsumerArgs) when not is_list(Queue) ->
-    subscribe(PoolName, [Queue], ConsumerModule, ConsumerArgs);
+subscribe(PoolName, Queue, SubsModule, SubsArgs) when not is_list(Queue) ->
+    subscribe(PoolName, [Queue], SubsModule, SubsArgs);
 
-subscribe(PoolName, Queues, ConsumerModule, ConsumerArgs) ->
+subscribe(PoolName, Queues, SubsModule, SubsArgs) ->
     PoolName2 = fox_utils:name_to_atom(PoolName),
     Sub = #subscription{
         ref = make_ref(),
         queues = Queues,
-        consumer_module = ConsumerModule,
-        consumer_args = ConsumerArgs
+        subs_module = SubsModule,
+        subs_args = SubsArgs
     },
     fox_conn_pool_sup:subscribe(PoolName2, Sub).
 

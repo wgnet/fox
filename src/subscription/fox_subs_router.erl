@@ -31,12 +31,12 @@ stop(Pid) ->
 init(#subscription{
     channel_pid = Channel,
     queues = Queues,
-    consumer_module = ConsumerModule,
-    consumer_args = ConsumerArgs} = Sub
+    subs_module = SubsModule,
+    subs_args = SubsArgs} = Sub
 ) ->
     io:format("~n#~nrouter init ~p~n", [Sub]),
     % TODO need supervisor to start worker
-    {ok, Worker} = fox_subs_worker:start_link(Channel, ConsumerModule, ConsumerArgs),
+    {ok, Worker} = fox_subs_worker:start_link(Channel, SubsModule, SubsArgs),
 
     Workers = lists:foldl(
         fun(Queue, W) ->
@@ -62,7 +62,7 @@ handle_call(stop, _From, #state{subscription = Sub, workers = Workers} = State) 
         maps:keys(Workers)),
 
     %% TODO stop all workers
-    %% ConsumerModule:terminate(ChannelPid, CState)
+    %% SubsModule:terminate(ChannelPid, CState)
     {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->

@@ -179,13 +179,13 @@ subscribe_state_test(_Config) ->
     ?assertMatch([
         #subscription{
             ref = Ref,
-            consumer_module = sample_subs_callback
+            subs_module = sample_subs_callback
         }
     ], EtsData),
     ?assertMatch([
         #subscription{
             ref = Ref,
-            consumer_module = sample_subs_callback
+            subs_module = sample_subs_callback
         }
     ], ets:lookup(TID, Ref)),
 

@@ -8,9 +8,9 @@
 -record(subscription, {
     ref :: reference(),
     channel_pid :: pid(),
-    consumer_pid :: pid(),
+    subs_pid :: pid(),
     queues :: [subscribe_queue()],
-    consumer_module :: module(),
-    consumer_args :: list()
+    subs_module :: module(),
+    subs_args :: list()
 }).
 

@@ -13,7 +13,7 @@
          map_to_basic_publish/1,
          map_to_pbasic/1,
          map_to_basic_qos/1,
-         close_connection/1, close_channel/1, close_consumer/1,
+         close_connection/1, close_channel/1, close_subs/1,
          channel_call/2, channel_call/3,
          channel_cast/2, channel_cast/3,
          call_callback/1
@@ -227,13 +227,13 @@ close_channel(Pid) ->
     end.
 
 
--spec close_consumer(pid()) -> ok.
-close_consumer(Pid) ->
+-spec close_subs(pid()) -> ok.
+close_subs(Pid) ->
     try
         fox_subs_router:stop(Pid), ok
     catch
-        exit:{noproc, _} -> ok; % consumer may already be closed
-        E:R -> error_logger:error_msg("can't close consumer~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
+        exit:{noproc, _} -> ok; % subscription may already be closed
+        E:R -> error_logger:error_msg("can't close subscription~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
     end.
 
 

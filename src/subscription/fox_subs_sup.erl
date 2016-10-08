@@ -1,7 +1,7 @@
 -module(fox_subs_sup).
 -behaviour(supervisor).
 
--export([start_link/0, start_consumer/1, init/1]).
+-export([start_link/0, start_router/1, init/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -12,8 +12,8 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 
--spec start_consumer(#subscription{}) -> startchild_ret().
-start_consumer(Sub) ->
+-spec start_router(#subscription{}) -> startchild_ret().
+start_router(Sub) ->
     supervisor:start_child(?MODULE, [Sub]).
 
 
