@@ -1,4 +1,4 @@
--module(fox_connection_worker).
+-module(fox_conn_worker).
 -behavior(gen_server).
 
 -export([start_link/2, get_info/1, create_channel/1, subscribe/2, unsubscribe/2, stop/1]).
@@ -148,12 +148,12 @@ handle_info(connect, #state{connection = undefined, connection_ref = undefined,
             fox_utils:call_callback(Callback),
             {noreply, State#state{connection = Connection, connection_ref = Ref, reconnect_attempt = 0}};
         {error, Reason} ->
-            error_logger:error_msg("fox_connection_worker could not connect to ~s ~p",
+            error_logger:error_msg("fox_conn_worker could not connect to ~s ~p",
                                    [fox_utils:params_network_to_str(Params), Reason]),
             {ok, MaxTimeout} = application:get_env(fox, max_reconnect_timeout),
             {ok, MinTimeout} = application:get_env(fox, min_reconnect_timeout),
             Timeout = herd_reconnect:exp_backoff(Attempt, MinTimeout, MaxTimeout),
-            error_logger:warning_msg("fox_connection_worker reconnect after ~p attempt ~p", [Timeout, Attempt]),
+            error_logger:warning_msg("fox_conn_worker reconnect after ~p attempt ~p", [Timeout, Attempt]),
             erlang:send_after(Timeout, self(), connect),
             {noreply, State#state{connection = undefined, connection_ref = undefined,
                                   reconnect_attempt = Attempt + 1}}
@@ -161,9 +161,7 @@ handle_info(connect, #state{connection = undefined, connection_ref = undefined,
 
 handle_info({'DOWN', Ref, process, Connection, Reason},
             #state{connection = Connection, connection_ref = Ref, disconnect_callback = Callback} = State) ->
-    error_or_info(Reason,
-                  "fox_connection_worker, connection is DOWN: ~p""fox_connection_worker, connection is DOWN: ~p",
-                  [Reason]),
+    error_or_info(Reason, "fox_conn_worker, connection is DOWN: ~p", [Reason]),
     self() ! connect,
     fox_utils:call_callback(Callback),
     {noreply, State#state{connection = undefined, connection_ref = undefined}};

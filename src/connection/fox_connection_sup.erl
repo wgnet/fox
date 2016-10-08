@@ -17,10 +17,10 @@ start_link(ConnectionParams, OtherParams, PoolSize) ->
 -spec init(gs_args()) -> sup_init_reply().
 init({ConnectionParams, OtherParams, PoolSize}) ->
     Spec = fun(Id) ->
-                   {{fox_connection_worker, Id},
-                    {fox_connection_worker, start_link, [ConnectionParams, OtherParams]},
+                   {{fox_conn_worker, Id},
+                    {fox_conn_worker, start_link, [ConnectionParams, OtherParams]},
                     transient, 2000, worker,
-                    [fox_connection_worker]}
+                    [fox_conn_worker]}
            end,
     Childs = [Spec(Id) || Id <- lists:seq(1, PoolSize)],
     {ok, {{one_for_one, 10, 60}, Childs}}.
@@ -29,7 +29,7 @@ init({ConnectionParams, OtherParams, PoolSize}) ->
 -spec create_channel(pid()) -> {ok, pid()} | {error, atom()}.
 create_channel(SupPid) ->
     case get_less_busy_connection(SupPid) of
-        {ok, Worker} -> fox_connection_worker:create_channel(Worker);
+        {ok, Worker} -> fox_conn_worker:create_channel(Worker);
         {error, Reason} -> {error, Reason}
     end.
 
@@ -38,7 +38,7 @@ create_channel(SupPid) ->
 subscribe(SupPid, Sub) ->
     case get_less_busy_connection(SupPid) of
     {ok, Worker} ->
-            fox_connection_worker:subscribe(Worker, Sub);
+            fox_conn_worker:subscribe(Worker, Sub);
         {error, Reason} -> {error, Reason}
     end.
 
@@ -46,7 +46,7 @@ subscribe(SupPid, Sub) ->
 -spec unsubscribe(pid(), reference()) -> ok | {error, term()}.
 unsubscribe(SupPid, Ref) ->
     Res = lists:map(fun({_, ChildPid, _, _}) ->
-                            fox_connection_worker:unsubscribe(ChildPid, Ref)
+                            fox_conn_worker:unsubscribe(ChildPid, Ref)
                     end,
                     supervisor:which_children(SupPid)),
     case lists:member(ok, Res) of
@@ -58,7 +58,7 @@ unsubscribe(SupPid, Ref) ->
 -spec stop(pid()) -> ok.
 stop(SupPid) ->
     lists:foreach(fun({_, ChildPid, _, _}) ->
-                          fox_connection_worker:stop(ChildPid)
+                          fox_conn_worker:stop(ChildPid)
                   end,
                   supervisor:which_children(SupPid)),
     ok.
@@ -72,7 +72,7 @@ get_less_busy_connection(SupPid) ->
     {NumChannels, Pid} = hd(lists:sort(
                               lists:map(
                                 fun({_, ChildPid, _, _}) ->
-                                        case fox_connection_worker:get_info(ChildPid) of
+                                        case fox_conn_worker:get_info(ChildPid) of
                                             {num_channels, Num} -> {Num, ChildPid};
                                             no_connection -> {infinity, ChildPid}
                                         end
