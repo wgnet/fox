@@ -14,10 +14,10 @@ start_link() ->
 init(_Args) ->
 
     ConnectionPoolSup =
-        {fox_connection_pool_sup,
-         {fox_connection_pool_sup, start_link, []},
+        {fox_conn_pool_sup,
+         {fox_conn_pool_sup, start_link, []},
          permanent, 2000, supervisor,
-         [fox_connection_pool_sup]},
+         [fox_conn_pool_sup]},
 
     ChannelSup =
         {fox_consumer_sup,

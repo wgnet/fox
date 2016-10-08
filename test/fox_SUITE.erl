@@ -90,7 +90,7 @@ sync_publish_test(_Config) ->
 -spec publish_pool_test(list()) -> ok.
 publish_pool_test(_Config) ->
     timer:sleep(200),
-    {ok, PoolPid} = fox_connection_pool_sup:get_publish_pool(publish_pool_test),
+    {ok, PoolPid} = fox_conn_pool_sup:get_publish_pool(publish_pool_test),
 
     {state, publish_pool_test, 4, Channels} = sys:get_state(PoolPid),
     ?assertEqual(0, queue:len(Channels)),
@@ -200,9 +200,9 @@ subscribe_state_test(_Config) ->
 
 -spec get_connection_worker(atom()) -> pid().
 get_connection_worker(PoolName) ->
-    ConnectionSups = supervisor:which_children(fox_connection_pool_sup),
+    ConnectionSups = supervisor:which_children(fox_conn_pool_sup),
     ConnectionSupPid = lists:foldl(fun({{fox_pub_channels_pool, _}, _, _, _}, Acc) -> Acc;
-                                      ({{fox_connection_sup, PName}, SupPid, _, _}, Acc) ->
+                                      ({{fox_conn_sup, PName}, SupPid, _, _}, Acc) ->
                                            case PName of
                                                PoolName -> SupPid;
                                                _ -> Acc

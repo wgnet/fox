@@ -1,4 +1,4 @@
--module(fox_connection_sup).
+-module(fox_conn_sup).
 -behaviour(supervisor).
 
 -export([start_link/3, init/1, create_channel/1, subscribe/2, unsubscribe/2, stop/1]).
