@@ -1,4 +1,4 @@
--module(fox_consume_router).
+-module(fox_subs_router).
 -behavior(gen_server).
 
 -export([start_link/1, stop/1]).
@@ -36,7 +36,7 @@ init(#subscription{
 ) ->
     io:format("~n#~nrouter init ~p~n", [Sub]),
     % TODO need supervisor to start worker
-    {ok, Worker} = fox_subscription_worker:start_link(Channel, ConsumerModule, ConsumerArgs),
+    {ok, Worker} = fox_subs_worker:start_link(Channel, ConsumerModule, ConsumerArgs),
 
     Workers = lists:foldl(
         fun(Queue, W) ->

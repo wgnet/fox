@@ -189,7 +189,7 @@ do_subscription(Connection, Sub) ->
     case amqp_connection:open_channel(Connection) of
         {ok, Channel} ->
             Sub2 = Sub#subscription{channel_pid = Channel},
-            {ok, Consumer} = fox_consumer_sup:start_consumer(Sub2),
+            {ok, Consumer} = fox_subs_sup:start_consumer(Sub2),
             {ok, Sub2#subscription{consumer_pid = Consumer}};
         {error, Reason} ->
             {error, Reason}

@@ -20,9 +20,9 @@ init(_Args) ->
          [fox_conn_pool_sup]},
 
     ChannelSup =
-        {fox_consumer_sup,
-         {fox_consumer_sup, start_link, []},
+        {fox_subs_sup,
+         {fox_subs_sup, start_link, []},
          permanent, 2000, supervisor,
-         [fox_consumer_sup]},
+         [fox_subs_sup]},
 
     {ok, {{one_for_one, 10, 60}, [ConnectionPoolSup, ChannelSup]}}.

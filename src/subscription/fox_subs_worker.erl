@@ -1,4 +1,4 @@
--module(fox_subscription_worker).
+-module(fox_subs_worker).
 -behavior(gen_server).
 
 -export([start_link/3, stop/1]).

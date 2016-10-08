@@ -1,5 +1,5 @@
 -module(subscribe_test).
--behaviour(fox_consume_router).
+-behaviour(fox_subs_router).
 
 -export([init/2, handle/3, terminate/2]).
 

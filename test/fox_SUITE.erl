@@ -165,7 +165,7 @@ subscribe_state_test(_Config) ->
             <<"my_queue">>,
             #'basic.consume'{queue = <<"other_queue">>}
         ],
-        sample_subscription_callback),
+        sample_subs_callback),
 
     ct:log("Ref:~p", [Ref]),
 
@@ -179,13 +179,13 @@ subscribe_state_test(_Config) ->
     ?assertMatch([
         #subscription{
             ref = Ref,
-            consumer_module = sample_subscription_callback
+            consumer_module = sample_subs_callback
         }
     ], EtsData),
     ?assertMatch([
         #subscription{
             ref = Ref,
-            consumer_module = sample_subscription_callback
+            consumer_module = sample_subs_callback
         }
     ], ets:lookup(TID, Ref)),
 

@@ -112,13 +112,13 @@ as argument to **amqp_client:subscribe/3**.
 
 **fox** provides other cowboy-like way.
 
-You should create callback module implementing **fox_subscription_worker** behaviour.
+You should create callback module implementing **fox_subs_worker** behaviour.
 This is something similar to cowboy handler.
 
 Then call **fox:subscribe(PoolName, Queues, ModuleName, Args)**.
 **fox** creates channel process and new process for you module, monitors them both, restarts them
 on reconnect or crash, subscribes to queues, routes messages and acknoledges them.
-You shouldn't care about all this things. You only need to implement **fox_subscription_worker** behaviour.
+You shouldn't care about all this things. You only need to implement **fox_subs_worker** behaviour.
 
 The second argument (Queues) can be single queue or list of queues. And queue can be
 set as simple binary value -- queue name, or as _#'basic.consume'{}_ record.
@@ -127,7 +127,7 @@ like exclusive, nowait, no_ack etc.
 
 The forth argument (Args) used to init you callback module.
 
-**fox_subscription_worker** behaviour includes 3 functions:
+**fox_subs_worker** behaviour includes 3 functions:
 
 **init(ChannelPid, Args)** gets channel pid and Args (forth argument to fox:subscribe).
 Here you can do any initialization steps, like, for example, creating exchanges and queues and bindings.
@@ -171,7 +171,7 @@ terminate(ChannelPid, State) ->
 ```
 
 Here is a sample callback module:
-[sample_subscription_callback](src/sample_subscription_callback.erl)
+[sample_subs_callback](src/sample_subs_callback.erl)
 
 
 **fox:unsubscribe(PoolName, ChannelPid)** unsubscribes and closes channel.

@@ -1,4 +1,4 @@
--module(fox_consumer_sup).
+-module(fox_subs_sup).
 -behaviour(supervisor).
 
 -export([start_link/0, start_consumer/1, init/1]).
@@ -19,8 +19,8 @@ start_consumer(Sub) ->
 
 -spec(init(gs_args()) -> sup_init_reply()).
 init(_Args) ->
-    Worker = {fox_consume_router,
-              {fox_consume_router, start_link, []},
+    Worker = {fox_subs_router,
+              {fox_subs_router, start_link, []},
               transient, 2000, worker,
-              [fox_consume_router]},
+              [fox_subs_router]},
     {ok, {{simple_one_for_one, 10, 60}, [Worker]}}.

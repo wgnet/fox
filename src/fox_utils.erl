@@ -230,7 +230,7 @@ close_channel(Pid) ->
 -spec close_consumer(pid()) -> ok.
 close_consumer(Pid) ->
     try
-        fox_consume_router:stop(Pid), ok
+        fox_subs_router:stop(Pid), ok
     catch
         exit:{noproc, _} -> ok; % consumer may already be closed
         E:R -> error_logger:error_msg("can't close consumer~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
