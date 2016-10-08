@@ -201,7 +201,7 @@ subscribe_state_test(_Config) ->
 -spec get_connection_worker(atom()) -> pid().
 get_connection_worker(PoolName) ->
     ConnectionSups = supervisor:which_children(fox_connection_pool_sup),
-    ConnectionSupPid = lists:foldl(fun({{fox_publish_channels_pool, _}, _, _, _}, Acc) -> Acc;
+    ConnectionSupPid = lists:foldl(fun({{fox_pub_channels_pool, _}, _, _, _}, Acc) -> Acc;
                                       ({{fox_connection_sup, PName}, SupPid, _, _}, Acc) ->
                                            case PName of
                                                PoolName -> SupPid;

@@ -30,10 +30,10 @@ start_pool(PoolName, ConnectionParams, OtherParams, PoolSize) ->
     error_logger:info_msg("fox start pool ~p ~s of size ~p",
                           [PoolName, fox_utils:params_network_to_str(ConnectionParams), PoolSize]),
     PublishChannelsPool =
-        {{fox_publish_channels_pool, PoolName},
-         {fox_publish_channels_pool, start_link, [PoolName]},
+        {{fox_pub_channels_pool, PoolName},
+         {fox_pub_channels_pool, start_link, [PoolName]},
          transient, 2000, worker,
-         [fox_publish_channels_pool]},
+         [fox_pub_channels_pool]},
     case supervisor:start_child(?MODULE, PublishChannelsPool) of
         {ok, _} ->
             ConnectionPoolSup = {{fox_connection_sup, PoolName},
@@ -51,10 +51,10 @@ start_pool(PoolName, ConnectionParams, OtherParams, PoolSize) ->
 -spec stop_pool(atom()) -> ok | {error, term()}.
 stop_pool(PoolName) ->
     error_logger:info_msg("fox stop pool ~p", [PoolName]),
-    ChildId1 = {fox_publish_channels_pool, PoolName},
+    ChildId1 = {fox_pub_channels_pool, PoolName},
     case find_child(ChildId1) of
         {ok, {ChildId1, ChildPid1, _, _}} ->
-            fox_publish_channels_pool:stop(ChildPid1),
+            fox_pub_channels_pool:stop(ChildPid1),
             ok = supervisor:terminate_child(?MODULE, ChildId1),
             supervisor:delete_child(?MODULE, ChildId1);
         {error, not_found} -> do_nothing
@@ -81,7 +81,7 @@ create_channel(PoolName) ->
 
 -spec get_publish_pool(atom()) -> {ok, pid()} | {error, atom()}.
 get_publish_pool(PoolName) ->
-    ChildId = {fox_publish_channels_pool, PoolName},
+    ChildId = {fox_pub_channels_pool, PoolName},
     case find_child(ChildId) of
         {ok, {ChildId, ChildPid, _, _}} -> {ok, ChildPid};
         {error, not_found} -> {error, pool_not_found}
@@ -91,7 +91,7 @@ get_publish_pool(PoolName) ->
 -spec get_publish_channel(atom()) -> {ok, pid()} | {error, atom()}.
 get_publish_channel(PoolName) ->
     case get_publish_pool(PoolName) of
-        {ok, PoolPid} -> fox_publish_channels_pool:get_channel(PoolPid);
+        {ok, PoolPid} -> fox_pub_channels_pool:get_channel(PoolPid);
         {error, Reason} -> {error, Reason}
     end.
 

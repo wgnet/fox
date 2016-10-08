@@ -1,4 +1,4 @@
--module(fox_publish_channels_pool).
+-module(fox_pub_channels_pool).
 -behavior(gen_server).
 
 -export([start_link/1, get_channel/1, stop/1]).
