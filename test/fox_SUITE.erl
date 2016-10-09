@@ -24,8 +24,6 @@ all() ->
     connection :: pid(),
     connection_ref :: reference(),
     params_network :: #amqp_params_network{},
-    connect_callback :: fox_callback(),
-    disconnect_callback :: fox_callback(),
     reconnect_attempt = 0 :: non_neg_integer(),
     subscriptions_ets :: ets:tid()
 }).
@@ -110,7 +108,7 @@ subscribe_test(_Config) ->
     T = ets:new(subscribe_test_ets, [public, named_table]),
     SortF = fun(I1, I2) -> element(1, I1) < element(1, I2) end,
 
-    {ok, Ref} = fox:subscribe(subscribe_test, <<"my_queue">>, subscribe_test, "some args"),
+    {ok, _Ref} = fox:subscribe(subscribe_test, <<"my_queue">>, subscribe_test, "some args"),
 
     timer:sleep(200),
     Res1 = lists:sort(SortF, ets:tab2list(T)),

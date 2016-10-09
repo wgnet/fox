@@ -3,7 +3,6 @@
 -export([validate_params_network/1,
          create_connection_pool/2,
          create_connection_pool/3,
-         create_connection_pool/4,
          close_connection_pool/1,
          create_channel/1,
          subscribe/3, subscribe/4, unsubscribe/2,
@@ -41,17 +40,11 @@ create_connection_pool(PoolName, Params) ->
 
 
 -spec create_connection_pool(pool_name(), #amqp_params_network{} | map(), integer()) -> ok.
-create_connection_pool(PoolName, #amqp_params_network{} = Params, PoolSize) ->
-    create_connection_pool(PoolName, Params, #{}, PoolSize);
-create_connection_pool(PoolName, Params, PoolSize) when is_map(Params) ->
-    create_connection_pool(PoolName, fox_utils:map_to_params_network(Params), Params, PoolSize).
-
-
--spec create_connection_pool(pool_name(), #amqp_params_network{}, map(), integer()) -> ok.
-create_connection_pool(PoolName, #amqp_params_network{} = ConnectionParams, OtherParams, PoolSize) ->
+create_connection_pool(PoolName, Params, PoolSize) ->
+    ConnectionParams = fox_utils:map_to_params_network(Params),
     true = fox_utils:validate_params_network_types(ConnectionParams),
     PoolName2 = fox_utils:name_to_atom(PoolName),
-    fox_conn_pool_sup:start_pool(PoolName2, ConnectionParams, OtherParams, PoolSize),
+    fox_conn_pool_sup:start_pool(PoolName2, ConnectionParams, PoolSize),
     ok.
 
 
@@ -251,7 +244,7 @@ test_run() ->
 
     Q1 = #'basic.consume'{queue = <<"my_queue">>},
     Q2 = <<"other_queue">>,
-    {ok, Ref} = subscribe("test_pool", [Q1, Q2], sample_subs_callback),
+    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_subs_callback),
 
 %%    timer:sleep(500),
 %%

@@ -15,8 +15,7 @@
          map_to_basic_qos/1,
          close_connection/1, close_channel/1, close_subs/1,
          channel_call/2, channel_call/3,
-         channel_cast/2, channel_cast/3,
-         call_callback/1
+         channel_cast/2, channel_cast/3
         ]).
 
 -include("fox.hrl").
@@ -30,7 +29,8 @@ name_to_atom(Name) when is_list(Name) -> list_to_atom(Name);
 name_to_atom(Name) when is_atom(Name) -> Name.
 
 
--spec map_to_params_network(map()) -> #amqp_params_network{}.
+-spec map_to_params_network(#amqp_params_network{} | map()) -> #amqp_params_network{}.
+map_to_params_network(#amqp_params_network{} = P) -> P;
 map_to_params_network(Params) when is_map(Params) ->
     #amqp_params_network{
         username = maps:get(username, Params, <<"guest">>),
@@ -275,8 +275,3 @@ channel_cast(ChannelPid, Method, Content) ->
     end.
 
 
--spec call_callback(fox_callback()) -> term().
-call_callback({P, M}) when is_pid(P) -> P ! M;
-call_callback({M, F}) when is_atom(M) andalso is_atom(F) -> erlang:apply(M, F, []);
-call_callback(F) when is_function(F) -> F();
-call_callback(undefined) -> do_nothing.
