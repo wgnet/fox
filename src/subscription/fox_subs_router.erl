@@ -34,7 +34,7 @@ init(#subscription{
     subs_module = SubsModule,
     subs_args = SubsArgs} = Sub
 ) ->
-    io:format("~n#~nrouter init ~p~n", [Sub]),
+    put('$module', ?MODULE),
     % TODO need supervisor to start worker
     {ok, Worker} = fox_subs_worker:start_link(Channel, SubsModule, SubsArgs),
 
@@ -48,7 +48,6 @@ init(#subscription{
             #'basic.consume_ok'{consumer_tag = Tag} = amqp_channel:subscribe(Channel, BConsume, self()),
             W#{Tag => Worker}
         end, #{}, Queues),
-    io:format("~n#~nWorkers:~p~n", [Workers]),
     {ok, #state{subscription = Sub, workers = Workers}}.
 
 

@@ -58,6 +58,7 @@ stop(Pid) ->
 
 -spec init(gs_args()) -> gs_init_reply().
 init({ConnectionParams, OtherParams}) ->
+    put('$module', ?MODULE),
     herd_rand:init_crypto(),
     TID = ets:new(subscriptions_ets, [{keypos, 2}]),
     self() ! connect,

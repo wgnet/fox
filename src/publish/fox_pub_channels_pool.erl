@@ -34,6 +34,7 @@ stop(Pid) ->
 
 -spec(init(gs_args()) -> gs_init_reply()).
 init(PoolName) ->
+    put('$module', ?MODULE),
     {ok, PoolSize} = application:get_env(fox, publish_pool_size),
     error_logger:info_msg("init publish channels pool ~p of size ~p", [PoolName, PoolSize]),
     {ok, #state{pool_name = PoolName, pool_size = PoolSize, channels = queue:new()}}.

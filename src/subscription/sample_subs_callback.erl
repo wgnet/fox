@@ -12,6 +12,7 @@
 
 -spec init(pid(), list()) -> {ok, state()}.
 init(Channel, Args) ->
+    put('$module', ?MODULE),
     error_logger:info_msg("sample_subs_callback:init channel:~p args:~p", [Channel, Args]),
 
     Exchange = <<"my_exchange">>,

@@ -35,6 +35,7 @@ stop(Pid) ->
 
 -spec init(gs_args()) -> gs_init_reply().
 init({Channel, SubsModule, SubsArgs}) ->
+    put('$module', ?MODULE),
     {ok, CState} = SubsModule:init(Channel, SubsArgs),
     {ok, #state{channel = Channel, callback = SubsModule, callback_state = CState}}.
 

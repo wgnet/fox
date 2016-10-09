@@ -16,6 +16,7 @@ start_link(ConnectionParams, OtherParams, PoolSize) ->
 
 -spec init(gs_args()) -> sup_init_reply().
 init({ConnectionParams, OtherParams, PoolSize}) ->
+    put('$module', ?MODULE),
     Spec = fun(Id) ->
                    {{fox_conn_worker, Id},
                     {fox_conn_worker, start_link, [ConnectionParams, OtherParams]},

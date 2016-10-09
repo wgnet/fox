@@ -19,6 +19,7 @@ start_router(Sub) ->
 
 -spec(init(gs_args()) -> sup_init_reply()).
 init(_Args) ->
+    put('$module', ?MODULE),
     Worker = {fox_subs_router,
               {fox_subs_router, start_link, []},
               transient, 2000, worker,
