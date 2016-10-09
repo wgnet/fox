@@ -1,6 +1,7 @@
 -module(fox_utils).
 
 -export([name_to_atom/1,
+         make_reg_name/2,
          map_to_params_network/1,
          params_network_to_str/1,
          validate_params_network_types/1,
@@ -27,6 +28,17 @@
 name_to_atom(Name) when is_binary(Name) -> erlang:binary_to_atom(Name, utf8);
 name_to_atom(Name) when is_list(Name) -> list_to_atom(Name);
 name_to_atom(Name) when is_atom(Name) -> Name.
+
+
+-spec make_reg_name(atom(), atom() | string() | integer()) -> atom().
+make_reg_name(Name, Suffix) when is_integer(Suffix) ->
+    make_reg_name(Name, integer_to_list(Suffix));
+make_reg_name(Name, Suffix) when is_atom(Suffix) ->
+    make_reg_name(Name, atom_to_list(Suffix));
+make_reg_name(Name, Suffix) when is_list(Suffix) ->
+    list_to_atom(
+        lists:flatten([atom_to_list(Name), "/", Suffix])
+    ).
 
 
 -spec map_to_params_network(#amqp_params_network{} | map()) -> #amqp_params_network{}.

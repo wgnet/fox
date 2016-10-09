@@ -1,7 +1,7 @@
 -module(fox_conn_pool).
 -behavior(gen_server).
 
--export([start_link/0, stop/1]).
+-export([start_link/3, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -14,9 +14,10 @@
 
 %%% module API
 
--spec start_link() -> gs_start_link_reply().
-start_link() ->
-    gen_server:start_link(?MODULE, no_args, []).
+-spec start_link(atom(), #amqp_params_network{}, integer()) -> gs_start_link_reply().
+start_link(PoolName, ConnectionParams, PoolSize) ->
+    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
+    gen_server:start_link({local, RegName}, ?MODULE, {PoolName, ConnectionParams, PoolSize}, []).
 
 
 -spec stop(pid()) -> ok.
@@ -29,9 +30,14 @@ stop(_Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(_Args) ->
+init({PoolName, ConnectionParams, PoolSize}) ->
     put('$module', ?MODULE),
-    {ok, #state{}}.
+    Connections = [
+        begin
+            {ok, Pid} = fox_conn_sup:create_connection(PoolName, Id, ConnectionParams),
+            Pid
+        end || Id <- lists:seq(1, PoolSize)],
+    {ok, #state{connections = queue:from_list(Connections)}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().

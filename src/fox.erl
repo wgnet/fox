@@ -44,20 +44,21 @@ create_connection_pool(PoolName, Params, PoolSize) ->
     ConnectionParams = fox_utils:map_to_params_network(Params),
     true = fox_utils:validate_params_network_types(ConnectionParams),
     PoolName2 = fox_utils:name_to_atom(PoolName),
-    fox_conn_pool_sup:start_pool(PoolName2, ConnectionParams, PoolSize),
+    {ok, _} = fox_sup:start_pool(PoolName2, ConnectionParams, PoolSize),
     ok.
 
 
 -spec close_connection_pool(pool_name()) -> ok | {error, term()}.
 close_connection_pool(PoolName) ->
     PoolName2 = fox_utils:name_to_atom(PoolName),
-    fox_conn_pool_sup:stop_pool(PoolName2).
+    fox_sup:stop_pool(PoolName2).
 
 
 -spec create_channel(pool_name()) -> {ok, pid()} | {error, term()}.
 create_channel(PoolName) ->
     PoolName2 = fox_utils:name_to_atom(PoolName),
-    fox_conn_pool_sup:create_channel(PoolName2).
+    %% fox_conn_pool_sup:create_channel(PoolName2).
+    ok.
 
 
 -spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module()) ->
@@ -79,13 +80,15 @@ subscribe(PoolName, Queues, SubsModule, SubsArgs) ->
         subs_module = SubsModule,
         subs_args = SubsArgs
     },
-    fox_conn_pool_sup:subscribe(PoolName2, Sub).
+    %% fox_conn_pool_sup:subscribe(PoolName2, Sub).
+    ok.
 
 
 -spec unsubscribe(pool_name(), reference()) -> ok | {error, term()}.
 unsubscribe(PoolName, Ref) ->
     PoolName2 = fox_utils:name_to_atom(PoolName),
-    fox_conn_pool_sup:unsubscribe(PoolName2, Ref).
+    %% fox_conn_pool_sup:unsubscribe(PoolName2, Ref).
+    ok.
 
 
 -spec declare_exchange(pid(), binary()) -> ok | {error, term()}.
@@ -202,10 +205,11 @@ publish(PoolOrChannel, Exchange, RoutingKey, Payload, Params) when is_binary(Pay
     if
         is_pid(PoolOrChannel) -> fox_utils:PublishFun(PoolOrChannel, Publish, Message);
         true -> PoolName = fox_utils:name_to_atom(PoolOrChannel),
-                case fox_conn_pool_sup:get_publish_channel(PoolName) of
-                    {ok, Channel} -> fox_utils:PublishFun(Channel, Publish, Message);
-                    {error, Reason} -> {error, Reason}
-                end
+%%                case fox_conn_pool_sup:get_publish_channel(PoolName) of
+%%                    {ok, Channel} -> fox_utils:PublishFun(Channel, Publish, Message);
+%%                    {error, Reason} -> {error, Reason}
+%%                end
+            ok
     end.
 
 
@@ -217,12 +221,13 @@ qos(PoolOrChannel, Params) ->
             #'basic.qos_ok'{} = amqp_channel:call(PoolOrChannel, QoS),
             ok;
         true -> PoolName = fox_utils:name_to_atom(PoolOrChannel),
-            case fox_conn_pool_sup:get_publish_channel(PoolName) of
-                {ok, Channel} ->
-                    #'basic.qos_ok'{} = amqp_channel:call(Channel, QoS),
-                    ok;
-                {error, Reason} -> {error, Reason}
-            end
+%%            case fox_conn_pool_sup:get_publish_channel(PoolName) of
+%%                {ok, Channel} ->
+%%                    #'basic.qos_ok'{} = amqp_channel:call(Channel, QoS),
+%%                    ok;
+%%                {error, Reason} -> {error, Reason}
+%%            end
+            ok
     end.
 
 
@@ -242,9 +247,11 @@ test_run() ->
     create_connection_pool("test_pool", Params),
     qos("test_pool", #{prefetch_count => 10}),
 
-    Q1 = #'basic.consume'{queue = <<"my_queue">>},
-    Q2 = <<"other_queue">>,
-    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_subs_callback),
+    create_connection_pool("other_pool", Params),
+
+%%    Q1 = #'basic.consume'{queue = <<"my_queue">>},
+%%    Q2 = <<"other_queue">>,
+%%    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_subs_callback),
 
 %%    timer:sleep(500),
 %%

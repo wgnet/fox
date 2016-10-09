@@ -1,7 +1,7 @@
 -module(fox_conn_worker).
 -behavior(gen_server).
 
--export([start_link/1, get_info/1, create_channel/1, subscribe/2, unsubscribe/2, stop/1]).
+-export([start_link/3, get_info/1, create_channel/1, subscribe/2, unsubscribe/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -13,17 +13,20 @@
     connection_ref :: reference(),
     params_network :: #amqp_params_network{},
     reconnect_attempt = 0 :: non_neg_integer(),
-    subscriptions_ets :: ets:tid() % keep subscriptions info to create them again after disconnect-reconnect
+    subscriptions_ets :: ets:tid() % TODO not needed
 }).
 
 
 %%% module API
 
--spec start_link(#amqp_params_network{}) -> gs_start_link_reply().
-start_link(ConnectionParams) ->
-    gen_server:start_link(?MODULE, ConnectionParams, []).
+-spec start_link(atom(), integer(), #amqp_params_network{}) -> gs_start_link_reply().
+start_link(PoolName, Id, ConnectionParams) ->
+    RegName0 = fox_utils:make_reg_name(?MODULE, PoolName),
+    RegName = fox_utils:make_reg_name(RegName0, Id),
+    gen_server:start_link({local, RegName}, ?MODULE, ConnectionParams, []).
 
 
+%% TODO not needed
 -spec get_info(pid()) -> {num_channels, integer()} | no_connection.
 get_info(Pid) ->
     case gen_server:call(Pid, get_connection, 15000) of
