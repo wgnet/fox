@@ -1,7 +1,7 @@
 -module(fox_conn_pool).
 -behavior(gen_server).
 
--export([start_link/3, stop/1]).
+-export([start_link/3, get_connection/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -18,6 +18,12 @@
 start_link(PoolName, ConnectionParams, PoolSize) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
     gen_server:start_link({local, RegName}, ?MODULE, {PoolName, ConnectionParams, PoolSize}, []).
+
+
+-spec get_connection(atom()) -> pid().
+get_connection(PoolName) ->
+    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
+    gen_server:call(RegName, get_connection).
 
 
 -spec stop(pid()) -> ok.
@@ -41,6 +47,11 @@ init({PoolName, ConnectionParams, PoolSize}) ->
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
+handle_call(get_connection, _From, #state{connections = Connections} = State) ->
+    {{value, Con}, Cons} = queue:out(Connections),
+    Cons2 = queue:in(Con, Cons),
+    {reply, Con, State#state{connections = Cons2}};
+
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
     {noreply, State}.
