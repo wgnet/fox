@@ -1,7 +1,7 @@
 -module(fox_conn_worker).
 -behavior(gen_server).
 
--export([start_link/3, subscribe/2, unsubscribe/2, stop/1]).
+-export([start_link/3, get_subs_router/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -26,14 +26,9 @@ start_link(PoolName, Id, ConnectionParams) ->
     gen_server:start_link({local, RegName}, ?MODULE, {PoolName, Id, ConnectionParams}, []).
 
 
--spec subscribe(pid(), #subscription{}) -> {ok, reference()} | {error, term()}.
-subscribe(Pid, Sub) ->
-    gen_server:call(Pid, Sub).
-
-
--spec unsubscribe(pid(), reference()) -> ok | {error, term()}.
-unsubscribe(Pid, SubscribeRef) ->
-    gen_server:call(Pid, {unsubscribe, SubscribeRef}).
+-spec get_subs_router(pid()) -> pid().
+get_subs_router(Pid) ->
+    gen_server:call(Pid, get_subs_router).
 
 
 -spec stop(pid()) -> ok.
@@ -58,29 +53,12 @@ init({PoolName, ConnectionId, ConnectionParams}) ->
     self() ! connect,
     {ok, #state{params_network = ConnectionParams, subs_routers = queue:from_list(Routers)}}.
 
+handle_call(get_subs_router, _From, #state{subs_routers = Routers} = State) ->
+    {{value, R}, Rs} = queue:out(Routers),
+    Rs2 = queue:in(R, Rs),
+    {reply, R, State#state{subs_routers = Rs2}};
 
-handle_call(#subscription{} = Sub, _From,
-            #state{connection = Connection} = State) ->
-    Reply = case Connection of
-                undefined -> % will start subscription later
-                    ok;
-                _Pid ->
-                    case do_subscription(Connection, Sub) of
-                        ok ->
-                            %% TODO call subs_router
-                            ok;
-                        {error, Reason} ->
-                            {error, Reason}
-                    end
-            end,
-    {reply, Reply, State};
-
-handle_call({unsubscribe, Ref}, _From, #state{} = State) ->
-    %% TODO unsubscribe
-    {reply, {error, subscription_not_found}, State};
-
-handle_call(stop, _From, #state{connection = Connection,
-                                connection_ref = Ref} = State) ->
+handle_call(stop, _From, #state{connection = Connection, connection_ref = _Ref} = State) ->
     case Connection of
         undefined -> do_nothing;
         Pid ->
@@ -147,17 +125,6 @@ code_change(_OldVersion, State, _Extra) ->
 
 
 %% inner functions
-
--spec do_subscription(pid(), #subscription{}) -> {ok, #subscription{}} | {error, term()}.
-do_subscription(Connection, Sub) ->
-    %% TODO
-    Sub.
-
--spec close_subscription(#subscription{}) -> #subscription{}.
-close_subscription(#subscription{} = Sub) ->
-    %% TODO
-    Sub.
-
 
 error_or_info(normal, ErrMsg, Params) ->
     error_logger:info_msg(ErrMsg, Params);

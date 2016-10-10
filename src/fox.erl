@@ -67,27 +67,28 @@ subscribe(PoolName, Queues, SubsModule) ->
     subscribe(PoolName, Queues, SubsModule, []).
 
 
--spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module(), list()) ->
-                       {ok, reference()} | {error, term()}.
+-spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module(), list()) -> {ok, reference()}.
 subscribe(PoolName, Queue, SubsModule, SubsArgs) when not is_list(Queue) ->
     subscribe(PoolName, [Queue], SubsModule, SubsArgs);
 
 subscribe(PoolName, Queues, SubsModule, SubsArgs) ->
     PoolName2 = fox_utils:name_to_atom(PoolName),
+    ConnWorker = fox_conn_pool:get_conn_worker(PoolName2),
+    SubsRouter = fox_conn_worker:get_subs_router(ConnWorker),
+    Ref = make_ref(),
     Sub = #subscription{
-        ref = make_ref(),
+        ref = Ref,
         queues = Queues,
         subs_module = SubsModule,
         subs_args = SubsArgs
     },
-    %% fox_conn_pool_sup:subscribe(PoolName2, Sub).
-    ok.
+    fox_subs_router:subscribe(SubsRouter, Sub),
+    {ok, Ref}.
 
 
 -spec unsubscribe(pool_name(), reference()) -> ok | {error, term()}.
 unsubscribe(PoolName, Ref) ->
     PoolName2 = fox_utils:name_to_atom(PoolName),
-    %% fox_conn_pool_sup:unsubscribe(PoolName2, Ref).
     ok.
 
 
@@ -249,9 +250,9 @@ test_run() ->
 
     create_connection_pool("other_pool", Params),
 
-%%    Q1 = #'basic.consume'{queue = <<"my_queue">>},
-%%    Q2 = <<"other_queue">>,
-%%    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_subs_callback),
+    Q1 = #'basic.consume'{queue = <<"my_queue">>},
+    Q2 = <<"other_queue">>,
+    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_subs_callback),
 
 %%    timer:sleep(500),
 %%
