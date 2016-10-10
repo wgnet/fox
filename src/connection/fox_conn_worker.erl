@@ -11,7 +11,7 @@
 -record(state, {
     connection :: pid(),
     connection_ref :: reference(),
-    params_network :: #amqp_params_network{},
+    connection_params :: #amqp_params_network{},
     reconnect_attempt = 0 :: non_neg_integer(),
     subs_routers :: queue:queue()
 }).
@@ -51,7 +51,7 @@ init({PoolName, ConnectionId, ConnectionParams}) ->
         end || RouterId <- lists:seq(1, NumChannels)],
 
     self() ! connect,
-    {ok, #state{params_network = ConnectionParams, subs_routers = queue:from_list(Routers)}}.
+    {ok, #state{connection_params = ConnectionParams, subs_routers = queue:from_list(Routers)}}.
 
 handle_call(get_subs_router, _From, #state{subs_routers = Routers} = State) ->
     {{value, R}, Rs} = queue:out(Routers),
@@ -63,7 +63,7 @@ handle_call(stop, _From, #state{connection = Connection, connection_ref = _Ref} 
         undefined -> do_nothing;
         Pid ->
             %% TODO unsubscribe and close all
-            fox_utils:close_connection(Pid)
+            fox_priv_utils:close_connection(Pid)
     end,
     {stop, normal, ok, State#state{connection = undefined, connection_ref = undefined}};
 
@@ -82,7 +82,7 @@ handle_cast(Any, State) ->
 handle_info(connect,
     #state{
         connection = undefined, connection_ref = undefined,
-        params_network = Params, reconnect_attempt = Attempt,
+        connection_params = Params, reconnect_attempt = Attempt,
         subs_routers = Routers
     } = State) ->
     case amqp_connection:start(Params) of
@@ -93,18 +93,14 @@ handle_info(connect,
         {error, Reason} ->
             error_logger:error_msg("fox_conn_worker could not connect to ~s ~p",
                                    [fox_utils:params_network_to_str(Params), Reason]),
-            {ok, MaxTimeout} = application:get_env(fox, max_reconnect_timeout),
-            {ok, MinTimeout} = application:get_env(fox, min_reconnect_timeout),
-            Timeout = herd_reconnect:exp_backoff(Attempt, MinTimeout, MaxTimeout),
-            error_logger:warning_msg("fox_conn_worker reconnect after ~p attempt ~p", [Timeout, Attempt]),
-            erlang:send_after(Timeout, self(), connect),
+            fox_priv_utils:reconnect(Attempt),
             {noreply, State#state{connection = undefined, connection_ref = undefined,
                                   reconnect_attempt = Attempt + 1}}
     end;
 
 handle_info({'DOWN', Ref, process, Connection, Reason},
             #state{connection = Connection, connection_ref = Ref} = State) ->
-    error_or_info(Reason, "fox_conn_worker, connection is DOWN: ~p", [Reason]),
+    fox_priv_utils:error_or_info(Reason, "fox_conn_worker, connection is DOWN: ~p", [Reason]),
     self() ! connect,
     {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
@@ -123,11 +119,3 @@ terminate(_Reason, _State) ->
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
 
-
-%% inner functions
-
-error_or_info(normal, ErrMsg, Params) ->
-    error_logger:info_msg(ErrMsg, Params);
-
-error_or_info(_, ErrMsg, Params) ->
-    error_logger:error_msg(ErrMsg, Params).

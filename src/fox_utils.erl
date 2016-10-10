@@ -14,7 +14,6 @@
          map_to_basic_publish/1,
          map_to_pbasic/1,
          map_to_basic_qos/1,
-         close_connection/1, close_channel/1, close_subs/1,
          channel_call/2, channel_call/3,
          channel_cast/2, channel_cast/3
         ]).
@@ -217,36 +216,6 @@ map_to_basic_qos(Params) ->
         prefetch_count = maps:get(prefetch_count, Params, 0),
         global = maps:get(global, Params, false)
     }.
-
-
--spec close_connection(pid()) -> ok.
-close_connection(Pid) ->
-    try
-        amqp_connection:close(Pid), ok
-    catch
-        exit:{noproc, _} -> ok; % connection may already be closed
-        E:R -> error_logger:error_msg("can't close connection~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
-    end.
-
-
--spec close_channel(pid()) -> ok.
-close_channel(Pid) ->
-    try
-        amqp_channel:close(Pid), ok
-    catch
-        exit:{noproc, _} -> ok; % channel may already be closed
-        E:R -> error_logger:error_msg("can't close channel~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
-    end.
-
-
--spec close_subs(pid()) -> ok.
-close_subs(Pid) ->
-    try
-        fox_subs_router:stop(Pid), ok
-    catch
-        exit:{noproc, _} -> ok; % subscription may already be closed
-        E:R -> error_logger:error_msg("can't close subscription~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
-    end.
 
 
 -spec channel_call(pid(), term()) -> term().
