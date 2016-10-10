@@ -38,12 +38,18 @@ init({PoolName, ConnectionParams, PoolSize}) ->
             [fox_conn_sup]
         },
         {
+            {fox_subs_sup, PoolName},
+            {fox_subs_sup, start_link, [PoolName]},
+            permanent, 2000, supervisor,
+            [fox_subs_sup]
+        },
+        {
             {fox_conn_pool, PoolName},
             {fox_conn_pool, start_link, [PoolName, ConnectionParams, PoolSize]},
             permanent, 2000, worker,
             [fox_conn_pool]
         }],
-    {ok, {{one_for_one, 10, 60}, Childs}}.
+    {ok, {{rest_for_one, 10, 60}, Childs}}.
 
 
 %%-spec stop_pool(atom()) -> ok | {error, term()}.

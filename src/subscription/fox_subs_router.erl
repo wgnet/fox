@@ -1,23 +1,28 @@
 -module(fox_subs_router).
 -behavior(gen_server).
 
--export([start_link/1, stop/1]).
+-export([start_link/0, connection_established/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
 
 -record(state, {
-    subscription :: #subscription{}, % TODO do I need it? I need only channel
+    channel :: pid(),
     workers :: map()
 }).
 
 
 %%% module API
 
--spec start_link(#subscription{}) -> gs_start_link_reply().
-start_link(Sub) ->
-    gen_server:start_link(?MODULE, Sub, []).
+-spec start_link() -> gs_start_link_reply().
+start_link() ->
+    gen_server:start_link(?MODULE, no_args, []).
+
+
+-spec connection_established(pid(), pid()) -> ok.
+connection_established(Pid, Conn) ->
+    gen_server:call(Pid, {connection_established, Conn}).
 
 
 -spec stop(pid()) -> ok.
@@ -28,32 +33,30 @@ stop(Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(#subscription{
-    channel_pid = Channel,
-    queues = Queues,
-    subs_module = SubsModule,
-    subs_args = SubsArgs} = Sub
-) ->
+init(_Args) ->
     put('$module', ?MODULE),
-    % TODO need supervisor to start worker
-    {ok, Worker} = fox_subs_worker:start_link(Channel, SubsModule, SubsArgs),
-
-    Workers = lists:foldl(
-        fun(Queue, W) ->
-            BConsume =
-                case Queue of
-                    #'basic.consume'{} = B -> B;
-                    QueueName when is_binary(QueueName) -> #'basic.consume'{queue = QueueName}
-                end,
-            #'basic.consume_ok'{consumer_tag = Tag} = amqp_channel:subscribe(Channel, BConsume, self()),
-            W#{Tag => Worker}
-        end, #{}, Queues),
-    {ok, #state{subscription = Sub, workers = Workers}}.
+%%    {ok, Worker} = fox_subs_worker:start_link(Channel, SubsModule, SubsArgs),
+%%
+%%    Workers = lists:foldl(
+%%        fun(Queue, W) ->
+%%            BConsume =
+%%                case Queue of
+%%                    #'basic.consume'{} = B -> B;
+%%                    QueueName when is_binary(QueueName) -> #'basic.consume'{queue = QueueName}
+%%                end,
+%%            #'basic.consume_ok'{consumer_tag = Tag} = amqp_channel:subscribe(Channel, BConsume, self()),
+%%            W#{Tag => Worker}
+%%        end, #{}, Queues),
+    {ok, #state{}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call(stop, _From, #state{subscription = Sub, workers = Workers} = State) ->
-    #subscription{channel_pid = Channel} = Sub,
+handle_call({connection_established, Conn}, _From, State) ->
+    {ok, Channel} = amqp_connection:open_channel(Conn),
+    %% TODO resubscribe all subs_workers
+    {reply, ok, State#state{channel = Channel}};
+
+handle_call(stop, _From, #state{channel = Channel, workers = Workers} = State) ->
     lists:foreach(
         fun(Tag) ->
             fox_utils:channel_call(Channel, #'basic.cancel'{consumer_tag = Tag})

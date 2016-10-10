@@ -1,7 +1,7 @@
 -module(fox_conn_worker).
 -behavior(gen_server).
 
--export([start_link/3, get_info/1, create_channel/1, subscribe/2, unsubscribe/2, stop/1]).
+-export([start_link/3, subscribe/2, unsubscribe/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -13,7 +13,7 @@
     connection_ref :: reference(),
     params_network :: #amqp_params_network{},
     reconnect_attempt = 0 :: non_neg_integer(),
-    subscriptions_ets :: ets:tid() % TODO not needed
+    subs_routers :: queue:queue()
 }).
 
 
@@ -23,21 +23,7 @@
 start_link(PoolName, Id, ConnectionParams) ->
     RegName0 = fox_utils:make_reg_name(?MODULE, PoolName),
     RegName = fox_utils:make_reg_name(RegName0, Id),
-    gen_server:start_link({local, RegName}, ?MODULE, ConnectionParams, []).
-
-
-%% TODO not needed
--spec get_info(pid()) -> {num_channels, integer()} | no_connection.
-get_info(Pid) ->
-    case gen_server:call(Pid, get_connection, 15000) of
-        undefined -> no_connection;
-        Connection -> hd(amqp_connection:info(Connection, [num_channels]))
-    end.
-
-
--spec create_channel(pid()) -> {ok, pid()} | {error, term()}.
-create_channel(Pid) ->
-    gen_server:call(Pid, create_channel).
+    gen_server:start_link({local, RegName}, ?MODULE, {PoolName, Id, ConnectionParams}, []).
 
 
 -spec subscribe(pid(), #subscription{}) -> {ok, reference()} | {error, term()}.
@@ -58,64 +44,49 @@ stop(Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(ConnectionParams) ->
+init({PoolName, ConnectionId, ConnectionParams}) ->
     put('$module', ?MODULE),
     herd_rand:init_crypto(),
-    TID = ets:new(subscriptions_ets, [{keypos, 2}]),
+
+    {ok, NumChannels} = application:get_env(fox, num_channels_per_connection),
+    Routers = [
+        begin
+            {ok, Pid} = fox_subs_sup:start_router(PoolName, ConnectionId * 100 + RouterId),
+            Pid
+        end || RouterId <- lists:seq(1, NumChannels)],
+
     self() ! connect,
-    {ok, #state{
-        params_network = ConnectionParams,
-        subscriptions_ets = TID
-    }}.
+    {ok, #state{params_network = ConnectionParams, subs_routers = queue:from_list(Routers)}}.
 
 
--spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call(get_connection, _From, #state{connection = Connection} = State) ->
-    {reply, Connection, State};
-
-handle_call(create_channel, _From, #state{connection = Connection} = State) ->
-    Reply = case Connection of
-                undefined -> {error, no_connection};
-                ConnectionPid -> amqp_connection:open_channel(ConnectionPid)
-            end,
-    {reply, Reply, State};
-
-handle_call(#subscription{ref = Ref} = Sub, _From,
-            #state{connection = Connection, subscriptions_ets = TID} = State) ->
+handle_call(#subscription{} = Sub, _From,
+            #state{connection = Connection} = State) ->
     Reply = case Connection of
                 undefined -> % will start subscription later
-                    ets:insert(TID, Sub),
-                    {ok, Ref};
+                    ok;
                 _Pid ->
                     case do_subscription(Connection, Sub) of
-                        {ok, Sub2} ->
-                            ets:insert(TID, Sub2),
-                            {ok, Ref};
+                        ok ->
+                            %% TODO call subs_router
+                            ok;
                         {error, Reason} ->
                             {error, Reason}
                     end
             end,
     {reply, Reply, State};
 
-handle_call({unsubscribe, Ref}, _From, #state{subscriptions_ets = TID} = State) ->
-    case ets:lookup(TID, Ref) of
-        [Subscription] -> close_subscription(Subscription),
-                          ets:delete(TID, Ref),
-                          {reply, ok, State};
-        [] -> {reply, {error, subscription_not_found}, State}
-    end;
+handle_call({unsubscribe, Ref}, _From, #state{} = State) ->
+    %% TODO unsubscribe
+    {reply, {error, subscription_not_found}, State};
 
 handle_call(stop, _From, #state{connection = Connection,
-                                connection_ref = Ref,
-                                subscriptions_ets = TID} = State) ->
+                                connection_ref = Ref} = State) ->
     case Connection of
         undefined -> do_nothing;
         Pid ->
-            lists:foreach(fun([Sub]) -> close_subscription(Sub) end, ets:match(TID, '$1')),
-            erlang:demonitor(Ref, [flush]),
+            %% TODO unsubscribe and close all
             fox_utils:close_connection(Pid)
     end,
-    ets:delete(TID),
     {stop, normal, ok, State#state{connection = undefined, connection_ref = undefined}};
 
 handle_call(Any, _From, State) ->
@@ -130,21 +101,17 @@ handle_cast(Any, State) ->
 
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
-handle_info(connect, #state{connection = undefined, connection_ref = undefined,
-                            params_network = Params, reconnect_attempt = Attempt,
-                            subscriptions_ets = TID} = State) ->
+handle_info(connect,
+    #state{
+        connection = undefined, connection_ref = undefined,
+        params_network = Params, reconnect_attempt = Attempt,
+        subs_routers = Routers
+    } = State) ->
     case amqp_connection:start(Params) of
-        {ok, Connection} ->
-            Ref = erlang:monitor(process, Connection),
-            NewSubs = lists:map(fun([Sub]) ->
-                                        close_subscription(Sub),
-                                        {ok, Sub2} = do_subscription(Connection, Sub),
-                                        Sub2
-                                end,
-                                ets:match(TID, '$1')),
-            ets:delete_all_objects(TID),
-            ets:insert(TID, NewSubs),
-            {noreply, State#state{connection = Connection, connection_ref = Ref, reconnect_attempt = 0}};
+        {ok, Conn} ->
+            Ref = erlang:monitor(process, Conn),
+            [fox_subs_router:connection_established(Pid, Conn) || Pid <- queue:to_list(Routers)],
+            {noreply, State#state{connection = Conn, connection_ref = Ref, reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("fox_conn_worker could not connect to ~s ~p",
                                    [fox_utils:params_network_to_str(Params), Reason]),
@@ -183,23 +150,13 @@ code_change(_OldVersion, State, _Extra) ->
 
 -spec do_subscription(pid(), #subscription{}) -> {ok, #subscription{}} | {error, term()}.
 do_subscription(Connection, Sub) ->
-    case amqp_connection:open_channel(Connection) of
-        {ok, Channel} ->
-            Sub2 = Sub#subscription{channel_pid = Channel},
-            {ok, Router} = fox_subs_sup:start_router(Sub2),
-            {ok, Sub2#subscription{subs_pid = Router}};
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
+    %% TODO
+    Sub.
 
 -spec close_subscription(#subscription{}) -> #subscription{}.
-close_subscription(#subscription{channel_pid = undefined, subs_pid = undefined} = Sub) ->
-    Sub;
-close_subscription(#subscription{channel_pid = ChannelPid, subs_pid = Router } = Sub) ->
-    fox_utils:close_subs(Router),
-    fox_utils:close_channel(ChannelPid),
-    Sub#subscription{channel_pid = undefined, subs_pid = undefined}.
+close_subscription(#subscription{} = Sub) ->
+    %% TODO
+    Sub.
 
 
 error_or_info(normal, ErrMsg, Params) ->

@@ -6,8 +6,6 @@
 
 -record(subscription, {
     ref :: reference(),
-    channel_pid :: pid(),
-    subs_pid :: pid(),
     queues :: [subscribe_queue()],
     subs_module :: module(),
     subs_args :: list()

@@ -1,7 +1,7 @@
 -module(fox_conn_sup).
 -behaviour(supervisor).
 
--export([start_link/1, create_connection/3, init/1]).
+-export([start_link/1, create_conn_worker/3, init/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -15,8 +15,8 @@ start_link(PoolName) ->
     supervisor:start_link({local, RegName}, ?MODULE, no_args).
 
 
--spec create_connection(atom(), integer(), #amqp_params_network{}) -> startchild_ret().
-create_connection(PoolName, Id, ConnectionParams) ->
+-spec create_conn_worker(atom(), integer(), #amqp_params_network{}) -> startchild_ret().
+create_conn_worker(PoolName, Id, ConnectionParams) ->
     Spec = {
         {fox_conn_worker, Id},
         {fox_conn_worker, start_link, [PoolName, Id, ConnectionParams]},
