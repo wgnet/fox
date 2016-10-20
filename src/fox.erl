@@ -68,21 +68,24 @@ subscribe(PoolName, Queue, SubsModule) ->
 
 -spec subscribe(pool_name(), subscribe_queue(), module(), list()) -> {ok, reference()}.
 subscribe(PoolName0, Queue, SubsModule, SubsArgs) ->
-    io:format("fox:subscribe P:~p, q:~p, m:~p, a:~p~n", [PoolName0, Queue, SubsModule, SubsArgs]),
     PoolName = fox_utils:name_to_atom(PoolName0),
-    Ref = make_ref(),
+
     Sub = #subscription{
-        ref = Ref,
         queue = Queue,
         subs_module = SubsModule,
         subs_args = SubsArgs
     },
     {ok, SubsWorkerPid} = fox_subs_sup:start_subscriber(PoolName, Sub),
-    io:format("SubsWorkerPid:~p~n", [SubsWorkerPid]),
     ConnWorkerPid = fox_conn_pool:get_conn_worker(PoolName),
-    io:format("ConnWorkerPid:~p~n", [ConnWorkerPid]),
     fox_conn_worker:register_subscriber(ConnWorkerPid, SubsWorkerPid),
-    {ok, Ref}.
+
+    SubsMeta = #subs_meta{
+        ref = make_ref(),
+        conn_worker = ConnWorkerPid,
+        subs_worker = SubsWorkerPid
+    },
+    fox_conn_pool:save_subscription(PoolName, SubsMeta),
+    {ok, SubsMeta#subs_meta.ref}.
 
 
 -spec unsubscribe(pool_name(), reference()) -> ok | {error, term()}.

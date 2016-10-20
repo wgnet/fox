@@ -1,14 +1,15 @@
 -module(fox_conn_pool).
 -behavior(gen_server).
 
--export([start_link/3, get_conn_worker/1, stop/1]).
+-export([start_link/3, get_conn_worker/1, save_subscription/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
 
 -record(state, {
-    conn_workers :: queue:queue()
+    conn_workers :: queue:queue(),
+    subscriptions :: map()
 }).
 
 
@@ -24,6 +25,12 @@ start_link(PoolName, ConnectionParams, PoolSize) ->
 get_conn_worker(PoolName) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
     gen_server:call(RegName, get_conn_worker).
+
+
+-spec save_subscription(atom(), #subs_meta{}) -> ok.
+save_subscription(PoolName, SubsMeta) ->
+    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
+    gen_server:call(RegName, {save_subscription, SubsMeta}).
 
 
 -spec stop(pid()) -> ok.
@@ -43,7 +50,7 @@ init({PoolName, ConnectionParams, PoolSize}) ->
             {ok, Pid} = fox_conn_sup:create_conn_worker(PoolName, Id, ConnectionParams),
             Pid
         end || Id <- lists:seq(1, PoolSize)],
-    {ok, #state{conn_workers = queue:from_list(Connections)}}.
+    {ok, #state{conn_workers = queue:from_list(Connections), subscriptions = #{}}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
@@ -51,6 +58,11 @@ handle_call(get_conn_worker, _From, #state{conn_workers = Workers} = State) ->
     {{value, W}, Ws} = queue:out(Workers),
     Ws2 = queue:in(W, Ws),
     {reply, W, State#state{conn_workers = Ws2}};
+
+handle_call({save_subscription, SubsMeta}, _From, #state{subscriptions = SubsMap} = State) ->
+    #subs_meta{ref = Ref} = SubsMeta,
+    SubsMap2 = SubsMap#{Ref => SubsMeta},
+    {reply, ok, State#state{subscriptions = SubsMap2}};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),

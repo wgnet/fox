@@ -5,9 +5,17 @@
 -type(subscribe_queue() :: queue_name() | #'basic.consume'{}).
 
 -record(subscription, {
-    ref :: reference(),
     queue :: subscribe_queue(),
     subs_module :: module(),
-    subs_args :: list()
+    subs_args :: list(),
+    channel :: pid(),
+    subs_state :: term(),
+    subs_tag :: binary()
+}).
+
+-record(subs_meta, {
+    ref :: reference(),
+    conn_worker :: pid(),
+    subs_worker :: pid()
 }).
 

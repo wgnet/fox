@@ -12,19 +12,10 @@
 -callback terminate(Channel :: pid(), State :: term()) -> ok.
 
 
--record(state, {
-    channel :: pid(),
-    subscription :: #subscription{},
-    subs_state :: term(),
-    subs_tag :: binary()
-}).
-
-
 %%% module API
 
 -spec start_link(#subscription{}) -> gs_start_link_reply().
 start_link(Subs) ->
-    io:format("fox_subs_worker:start_link ~p~n", [Subs]),
     gen_server:start_link(?MODULE, Subs, []).
 
 
@@ -42,16 +33,18 @@ stop(Pid) ->
 
 -spec init(gs_args()) -> gs_init_reply().
 init(Subs) ->
-    io:format("fox_subs_worker:init ~p~n", [Subs]),
     put('$module', ?MODULE),
-    {ok, #state{subscription = Subs}}.
+    {ok, Subs}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call(stop, _From, State) ->
-    #state{channel = Channel, subscription = Subs,
-        subs_state = SubsState, subs_tag = Tag} = State,
-    #subscription{subs_module = Module} = Subs,
+handle_call(stop, _From,
+    #subscription{
+        channel = Channel,
+        subs_module = Module,
+        subs_state = SubsState,
+        subs_tag = Tag}
+        = State) ->
     Module:terminate(Channel, SubsState),
     fox_utils:channel_call(Channel, #'basic.cancel'{consumer_tag = Tag}),
     {stop, normal, ok, State};
@@ -62,9 +55,12 @@ handle_call(Any, _From, State) ->
 
 
 -spec handle_cast(gs_request(), gs_state()) -> gs_cast_reply().
-handle_cast({connection_established, Conn}, #state{subscription = Subs} = State) ->
-    io:format("fox_subs_worker connection_established ~p~n", [Conn]),
-    #subscription{queue = Queue, subs_module = Module, subs_args = Args} = Subs,
+handle_cast({connection_established, Conn},
+    #subscription{
+        queue = Queue,
+        subs_module = Module,
+        subs_args = Args}
+        = State) ->
     {ok, Channel} = amqp_connection:open_channel(Conn),
     {ok, SubsState} = Module:init(Channel, Args),
     BConsume = case Queue of
@@ -74,7 +70,7 @@ handle_cast({connection_established, Conn}, #state{subscription = Subs} = State)
                end,
     #'basic.consume_ok'{consumer_tag = Tag} =
         amqp_channel:subscribe(Channel, BConsume, self()),
-    {noreply, State#state{channel = Channel, subs_state = SubsState, subs_tag = Tag}};
+    {noreply, State#subscription{channel = Channel, subs_state = SubsState, subs_tag = Tag}};
 
 
 handle_cast(Any, State) ->
@@ -84,16 +80,13 @@ handle_cast(Any, State) ->
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
 handle_info(#'basic.consume_ok'{} = Msg, State) ->
-    SubsState = handle(Msg, State),
-    {noreply, State#state{subs_state = SubsState}};
+    {noreply, handle(Msg, State)};
 
 handle_info({#'basic.deliver'{}, #amqp_msg{}} = Msg, State) ->
-    SubsState = handle(Msg, State),
-    {noreply, State#state{subs_state = SubsState}};
+    {noreply, handle(Msg, State)};
 
 handle_info(#'basic.cancel'{} = Msg, State) ->
-    SubsState = handle(Msg, State),
-    {noreply, State#state{subs_state = SubsState}};
+    {noreply, handle(Msg, State)};
 
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
@@ -111,7 +104,11 @@ code_change(_OldVersion, State, _Extra) ->
 
 
 
-handle(Msg, #state{channel = Channel, subscription = Subs, subs_state = SubsState}) ->
-    #subscription{subs_module = Module} = Subs,
+handle(Msg,
+    #subscription{
+        channel = Channel,
+        subs_module = Module,
+        subs_state = SubsState}
+        = State) ->
     {ok, SubsState2} = Module:handle(Msg, Channel, SubsState),
-    SubsState2.
+    State#subscription{subs_state = SubsState2}.

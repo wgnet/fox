@@ -68,7 +68,6 @@ handle_call(Any, _From, State) ->
 
 -spec handle_cast(gs_request(), gs_state()) -> gs_cast_reply().
 handle_cast({register_subscriber, Pid}, #state{connection = Conn, subscribers = Subs} = State) ->
-    io:format("fox_conn_worker register_subscriber ~p~n", [Pid]),
     case Conn of
         undefined -> do_nothing;
         _ -> fox_subs_worker:connection_established(Pid, Conn)
@@ -89,7 +88,6 @@ handle_info(connect,
     } = State) ->
     case amqp_connection:start(Params) of
         {ok, Conn} ->
-            io:format("fox_conn_worker connected ~p~n", [Conn]),
             Ref = erlang:monitor(process, Conn),
             [fox_subs_worker:connection_established(Pid, Conn) || Pid <- Subscribers],
             {noreply,

@@ -13,7 +13,7 @@ start_link(PoolName) ->
     supervisor:start_link({local, RegName}, ?MODULE, no_args).
 
 
--spec start_subscriber(pool_name(), #subscription{}) -> startchild_ret().
+-spec start_subscriber(atom(), #subscription{}) -> startchild_ret().
 start_subscriber(PoolName, Sub) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
     supervisor:start_child(RegName, [Sub]).
