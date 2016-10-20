@@ -75,23 +75,30 @@ subscribe(PoolName0, Queue, SubsModule, SubsArgs) ->
         subs_module = SubsModule,
         subs_args = SubsArgs
     },
-    {ok, SubsWorkerPid} = fox_subs_sup:start_subscriber(PoolName, Sub),
-    ConnWorkerPid = fox_conn_pool:get_conn_worker(PoolName),
-    fox_conn_worker:register_subscriber(ConnWorkerPid, SubsWorkerPid),
+    {ok, SPid} = fox_subs_sup:start_subscriber(PoolName, Sub),
+    CPid = fox_conn_pool:get_conn_worker(PoolName),
+    fox_conn_worker:register_subscriber(CPid, SPid),
 
     SubsMeta = #subs_meta{
         ref = make_ref(),
-        conn_worker = ConnWorkerPid,
-        subs_worker = SubsWorkerPid
+        conn_worker = CPid,
+        subs_worker = SPid
     },
-    fox_conn_pool:save_subscription(PoolName, SubsMeta),
+    fox_conn_pool:save_subs_meta(PoolName, SubsMeta),
     {ok, SubsMeta#subs_meta.ref}.
 
 
 -spec unsubscribe(pool_name(), reference()) -> ok | {error, term()}.
 unsubscribe(PoolName0, Ref) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
-    ok.
+    case fox_conn_pool:get_subs_meta(PoolName, Ref) of
+        #subs_meta{conn_worker = CPid, subs_worker = SPid} ->
+            fox_conn_worker:remove_subscriber(CPid, SPid),
+            fox_conn_pool:remove_subs_meta(PoolName, Ref),
+            fox_subs_worker:stop(SPid),
+            ok;
+        not_found -> {error, not_found}
+    end.
 
 
 -spec declare_exchange(pid(), binary()) -> ok | {error, term()}.

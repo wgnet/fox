@@ -1,7 +1,12 @@
 -module(fox_conn_pool).
 -behavior(gen_server).
 
--export([start_link/3, get_conn_worker/1, save_subscription/2, stop/1]).
+-export([
+    start_link/3,
+    get_conn_worker/1,
+    save_subs_meta/2, get_subs_meta/2, remove_subs_meta/2,
+    stop/1
+]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -27,10 +32,22 @@ get_conn_worker(PoolName) ->
     gen_server:call(RegName, get_conn_worker).
 
 
--spec save_subscription(atom(), #subs_meta{}) -> ok.
-save_subscription(PoolName, SubsMeta) ->
+-spec save_subs_meta(atom(), #subs_meta{}) -> ok.
+save_subs_meta(PoolName, SubsMeta) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
-    gen_server:call(RegName, {save_subscription, SubsMeta}).
+    gen_server:call(RegName, {save_subs_meta, SubsMeta}).
+
+
+-spec get_subs_meta(atom(), reference()) -> #subs_meta{} | not_found.
+get_subs_meta(PoolName, Ref) ->
+    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
+    gen_server:call(RegName, {get_subs_meta, Ref}).
+
+
+-spec remove_subs_meta(atom(), reference()) -> ok.
+remove_subs_meta(PoolName, Ref) ->
+    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
+    gen_server:cast(RegName, {remove_subs_meta, Ref}).
 
 
 -spec stop(pid()) -> ok.
@@ -59,10 +76,17 @@ handle_call(get_conn_worker, _From, #state{conn_workers = Workers} = State) ->
     Ws2 = queue:in(W, Ws),
     {reply, W, State#state{conn_workers = Ws2}};
 
-handle_call({save_subscription, SubsMeta}, _From, #state{subscriptions = SubsMap} = State) ->
+handle_call({save_subs_meta, SubsMeta}, _From, #state{subscriptions = SubsMap} = State) ->
     #subs_meta{ref = Ref} = SubsMeta,
     SubsMap2 = SubsMap#{Ref => SubsMeta},
     {reply, ok, State#state{subscriptions = SubsMap2}};
+
+handle_call({get_subs_meta, Ref}, _From, #state{subscriptions = SubsMap} = State) ->
+    Reply = case maps:find(Ref, SubsMap) of
+        {ok, SubsMeta} -> SubsMeta;
+        error -> not_found
+    end,
+    {reply, Reply, State};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
@@ -70,6 +94,10 @@ handle_call(Any, _From, State) ->
 
 
 -spec handle_cast(gs_request(), gs_state()) -> gs_cast_reply().
+handle_cast({remove_subs_meta, Ref}, #state{subscriptions = SubsMap} = State) ->
+    SubsMap2 = maps:remove(Ref, SubsMap),
+    {reply, ok, State#state{subscriptions = SubsMap2}};
+
 handle_cast(Any, State) ->
     error_logger:error_msg("unknown cast ~p in ~p ~n", [Any, ?MODULE]),
     {noreply, State}.

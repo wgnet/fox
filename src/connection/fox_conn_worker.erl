@@ -6,7 +6,7 @@
 -module(fox_conn_worker).
 -behavior(gen_server).
 
--export([start_link/3, register_subscriber/2, stop/1]).
+-export([start_link/3, register_subscriber/2, remove_subscriber/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -34,6 +34,11 @@ start_link(PoolName, Id, ConnParams) ->
 -spec register_subscriber(pid(), pid()) -> ok.
 register_subscriber(ConnWorkerPid, SubsWorkerPid) ->
     gen_server:cast(ConnWorkerPid, {register_subscriber, SubsWorkerPid}).
+
+
+-spec remove_subscriber(pid(), pid()) -> ok.
+remove_subscriber(ConnWorkerPid, SubsWorkerPid) ->
+    gen_server:cast(ConnWorkerPid, {remove_subscriber, SubsWorkerPid}).
 
 
 -spec stop(pid()) -> ok.
@@ -73,6 +78,10 @@ handle_cast({register_subscriber, Pid}, #state{connection = Conn, subscribers = 
         _ -> fox_subs_worker:connection_established(Pid, Conn)
     end,
     {noreply, State#state{subscribers = [Pid | Subs]}};
+
+handle_cast({remove_subscriber, Pid}, #state{subscribers = Subs} = State) ->
+    Subs2 = lists:delete(Pid, Subs),
+    {noreply, State#state{subscribers = Subs2}};
 
 handle_cast(Any, State) ->
     error_logger:error_msg("unknown cast ~p in ~p ~n", [Any, ?MODULE]),

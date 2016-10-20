@@ -45,8 +45,9 @@ handle_call(stop, _From,
         subs_state = SubsState,
         subs_tag = Tag}
         = State) ->
-    Module:terminate(Channel, SubsState),
     fox_utils:channel_call(Channel, #'basic.cancel'{consumer_tag = Tag}),
+    Module:terminate(Channel, SubsState),
+    fox_priv_utils:close_channel(Channel),
     {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
