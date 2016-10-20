@@ -11,6 +11,7 @@
          declare_queue/2, declare_queue/3,
          delete_queue/2, delete_queue/3,
          bind_queue/4, bind_queue/5,
+
          unbind_queue/4, unbind_queue/5,
          publish/4, publish/5,
          qos/2,
@@ -40,54 +41,53 @@ create_connection_pool(PoolName, Params) ->
 
 
 -spec create_connection_pool(pool_name(), #amqp_params_network{} | map(), integer()) -> ok.
-create_connection_pool(PoolName, Params, PoolSize) ->
+create_connection_pool(PoolName0, Params, PoolSize) ->
     ConnectionParams = fox_utils:map_to_params_network(Params),
     true = fox_utils:validate_params_network_types(ConnectionParams),
-    PoolName2 = fox_utils:name_to_atom(PoolName),
-    {ok, _} = fox_sup:start_pool(PoolName2, ConnectionParams, PoolSize),
+    PoolName = fox_utils:name_to_atom(PoolName0),
+    {ok, _} = fox_sup:start_pool(PoolName, ConnectionParams, PoolSize),
     ok.
 
 
 -spec close_connection_pool(pool_name()) -> ok | {error, term()}.
-close_connection_pool(PoolName) ->
-    PoolName2 = fox_utils:name_to_atom(PoolName),
-    fox_sup:stop_pool(PoolName2).
+close_connection_pool(PoolName0) ->
+    PoolName = fox_utils:name_to_atom(PoolName0),
+    fox_sup:stop_pool(PoolName).
 
 
 -spec get_channel(pool_name()) -> {ok, pid()} | {error, term()}.
-get_channel(PoolName) ->
-    PoolName2 = fox_utils:name_to_atom(PoolName),
-    fox_pub_pool:get_channel(PoolName2).
+get_channel(PoolName0) ->
+    PoolName = fox_utils:name_to_atom(PoolName0),
+    fox_pub_pool:get_channel(PoolName).
 
 
--spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module()) ->
-                       {ok, reference()} | {error, term()}.
-subscribe(PoolName, Queues, SubsModule) ->
-    subscribe(PoolName, Queues, SubsModule, []).
+-spec subscribe(pool_name(), subscribe_queue(), module()) -> {ok, reference()} | {error, term()}.
+subscribe(PoolName, Queue, SubsModule) ->
+    subscribe(PoolName, Queue, SubsModule, []).
 
 
--spec subscribe(pool_name(), subscribe_queue() | [subscribe_queue()], module(), list()) -> {ok, reference()}.
-subscribe(PoolName, Queue, SubsModule, SubsArgs) when not is_list(Queue) ->
-    subscribe(PoolName, [Queue], SubsModule, SubsArgs);
-
-subscribe(PoolName, Queues, SubsModule, SubsArgs) ->
-    PoolName2 = fox_utils:name_to_atom(PoolName),
-    ConnWorker = fox_conn_pool:get_conn_worker(PoolName2),
-    SubsRouter = fox_conn_worker:get_subs_router(ConnWorker),
+-spec subscribe(pool_name(), subscribe_queue(), module(), list()) -> {ok, reference()}.
+subscribe(PoolName0, Queue, SubsModule, SubsArgs) ->
+    io:format("fox:subscribe P:~p, q:~p, m:~p, a:~p~n", [PoolName0, Queue, SubsModule, SubsArgs]),
+    PoolName = fox_utils:name_to_atom(PoolName0),
     Ref = make_ref(),
     Sub = #subscription{
         ref = Ref,
-        queues = Queues,
+        queue = Queue,
         subs_module = SubsModule,
         subs_args = SubsArgs
     },
-    fox_subs_router:subscribe(SubsRouter, Sub),
+    {ok, SubsWorkerPid} = fox_subs_sup:start_subscriber(PoolName, Sub),
+    io:format("SubsWorkerPid:~p~n", [SubsWorkerPid]),
+    ConnWorkerPid = fox_conn_pool:get_conn_worker(PoolName),
+    io:format("ConnWorkerPid:~p~n", [ConnWorkerPid]),
+    fox_conn_worker:register_subscriber(ConnWorkerPid, SubsWorkerPid),
     {ok, Ref}.
 
 
 -spec unsubscribe(pool_name(), reference()) -> ok | {error, term()}.
-unsubscribe(PoolName, Ref) ->
-    PoolName2 = fox_utils:name_to_atom(PoolName),
+unsubscribe(PoolName0, Ref) ->
+    PoolName = fox_utils:name_to_atom(PoolName0),
     ok.
 
 
@@ -194,7 +194,8 @@ publish(PoolOrChannel, Exchange, RoutingKey, Payload) ->
 
 -spec publish(pool_name() | pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
 publish(PoolOrChannel, Exchange, RoutingKey, Payload, Params) when is_binary(Payload) ->
-    Publish = fox_utils:map_to_basic_publish(Params#{exchange => Exchange, routing_key => RoutingKey}),
+    Publish = fox_utils:map_to_basic_publish(
+        Params#{exchange => Exchange, routing_key => RoutingKey}),
     PBasic = fox_utils:map_to_pbasic(Params),
     Message = #amqp_msg{payload = Payload, props = PBasic},
 
@@ -246,12 +247,12 @@ test_run() ->
 
     create_connection_pool("test_pool", Params),
     qos("test_pool", #{prefetch_count => 10}),
+    Q1 = #'basic.consume'{queue = <<"my_queue">>},
+    {ok, _Ref1} = subscribe("test_pool", Q1, sample_subs_callback),
 
     create_connection_pool("other_pool", Params),
-
-    Q1 = #'basic.consume'{queue = <<"my_queue">>},
     Q2 = <<"other_queue">>,
-    {ok, _Ref} = subscribe("test_pool", [Q1, Q2], sample_subs_callback),
+    {ok, _Ref2} = subscribe("other_pool", Q2, sample_subs_callback),
 
     timer:sleep(500),
 
@@ -259,7 +260,7 @@ test_run() ->
     publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
     publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
     publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 3">>),
-    publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
+    publish("other_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
 
 %%    timer:sleep(1000),
 %%

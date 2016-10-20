@@ -11,7 +11,6 @@
          {connection_timeout, 10000},
          {max_reconnect_timeout, 5000},
          {min_reconnect_timeout, 100},
-         {num_channels_per_connection, 5},
          {num_publish_channels, 20}
         ]}
  ]}.

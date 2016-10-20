@@ -6,7 +6,7 @@
 
 -record(subscription, {
     ref :: reference(),
-    queues :: [subscribe_queue()],
+    queue :: subscribe_queue(),
     subs_module :: module(),
     subs_args :: list()
 }).

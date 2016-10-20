@@ -34,6 +34,10 @@ init(Channel, Args) ->
 
 
 -spec handle(term(), pid(), state()) -> {ok, state()}.
+handle(#'basic.consume_ok'{} = Data, _Channel, State) ->
+    error_logger:info_msg("sample_subs_callback:handle basic.consume_ok, Data:~p", [Data]),
+    {ok, State};
+
 handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, Channel, State) ->
     error_logger:info_msg("sample_subs_callback:handle basic.deliver, Payload:~p", [Payload]),
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag}),
