@@ -19,3 +19,7 @@
     subs_worker :: pid()
 }).
 
+
+%% TEMP
+-define(log(F), io:format(F ++ "~n")).
+-define(log(F, A), io:format(F ++ "~n", A)).

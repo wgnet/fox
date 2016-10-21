@@ -258,7 +258,7 @@ test_run() ->
     create_connection_pool("test_pool", Params),
     qos("test_pool", #{prefetch_count => 10}),
     Q1 = #'basic.consume'{queue = <<"my_queue">>},
-    {ok, _Ref1} = subscribe("test_pool", Q1, sample_subs_callback),
+    {ok, Ref1} = subscribe("test_pool", Q1, sample_subs_callback),
 
     create_connection_pool("other_pool", Params),
     Q2 = <<"other_queue">>,
@@ -272,9 +272,9 @@ test_run() ->
     publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 3">>),
     publish("other_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
 
-%%    timer:sleep(1000),
-%%
-%%    unsubscribe("test_pool", Ref),
+    timer:sleep(1000),
+
+    unsubscribe("test_pool", Ref1),
 %%    amqp_channel:close(PChannel),
 %%    close_connection_pool("test_pool"),
 

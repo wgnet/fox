@@ -96,7 +96,7 @@ handle_call(Any, _From, State) ->
 -spec handle_cast(gs_request(), gs_state()) -> gs_cast_reply().
 handle_cast({remove_subs_meta, Ref}, #state{subscriptions = SubsMap} = State) ->
     SubsMap2 = maps:remove(Ref, SubsMap),
-    {reply, ok, State#state{subscriptions = SubsMap2}};
+    {noreply, State#state{subscriptions = SubsMap2}};
 
 handle_cast(Any, State) ->
     error_logger:error_msg("unknown cast ~p in ~p ~n", [Any, ?MODULE]),
