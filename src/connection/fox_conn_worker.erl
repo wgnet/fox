@@ -58,7 +58,6 @@ init(ConnParams) ->
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
 handle_call(stop, _From, #state{connection = Conn, connection_ref = Ref} = State) ->
-    ?log("~p:stop pid:~p conn:~p", [?MODULE, self(), Conn]),
     case Conn of
         undefined -> do_nothing;
         Pid ->

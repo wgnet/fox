@@ -69,7 +69,6 @@ handle_call(stop, _From,
         connection_ref = Ref,
         channels = Channels}
         = State) ->
-    ?log("~p:stop pid:~p, conn:~p, channels:~p", [?MODULE, self(), Conn, Channels]),
     case Conn of
         undefined -> do_nothing;
         Pid ->
@@ -78,7 +77,6 @@ handle_call(stop, _From,
     end,
     lists:foreach(
         fun(Channel) ->
-            ?log("close channel ~p", [Channel]),
             fox_priv_utils:close_channel(Channel)
         end,
         queue:to_list(Channels)
