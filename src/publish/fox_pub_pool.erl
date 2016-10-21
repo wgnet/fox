@@ -42,6 +42,7 @@ stop(Pid) ->
 init(ConnectionParams) ->
     put('$module', ?MODULE),
     {ok, NumChannels} = application:get_env(fox, num_publish_channels),
+    herd_rand:init_crypto(),
     self() ! connect,
     {ok, #state{connection_params = ConnectionParams, num_channels = NumChannels, channels = queue:new()}}.
 
@@ -85,12 +86,17 @@ handle_info(connect,
     case amqp_connection:start(Params) of
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
-            {noreply, State#state{connection = Conn, connection_ref = Ref, reconnect_attempt = 0}};
+            {noreply, State#state{
+                connection = Conn,
+                connection_ref = Ref,
+                reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("fox_pub_pool could not connect to ~s ~p",
                 [fox_utils:params_network_to_str(Params), Reason]),
             fox_priv_utils:reconnect(Attempt),
-            {noreply, State#state{connection = undefined, connection_ref = undefined,
+            {noreply, State#state{
+                connection = undefined,
+                connection_ref = undefined,
                 reconnect_attempt = Attempt + 1}}
     end;
 

@@ -99,20 +99,18 @@ handle_info(connect,
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
             [fox_subs_worker:connection_established(Pid, Conn) || Pid <- Subscribers],
-            {noreply,
-                State#state{
-                    connection = Conn,
-                    connection_ref = Ref,
-                    reconnect_attempt = 0}};
+            {noreply, State#state{
+                connection = Conn,
+                connection_ref = Ref,
+                reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("fox_conn_worker could not connect to ~s ~p",
-                                   [fox_utils:params_network_to_str(Params), Reason]),
+                [fox_utils:params_network_to_str(Params), Reason]),
             fox_priv_utils:reconnect(Attempt),
-            {noreply,
-                State#state{
-                    connection = undefined,
-                    connection_ref = undefined,
-                    reconnect_attempt = Attempt + 1}}
+            {noreply, State#state{
+                connection = undefined,
+                connection_ref = undefined,
+                reconnect_attempt = Attempt + 1}}
     end;
 
 handle_info({'DOWN', Ref, process, Conn, Reason},
