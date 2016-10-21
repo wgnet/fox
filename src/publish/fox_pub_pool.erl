@@ -25,15 +25,16 @@ start_link(PoolName, ConnectionParams) ->
     gen_server:start_link({local, RegName}, ?MODULE, ConnectionParams, []).
 
 
--spec get_channel(pid()) -> {ok, pid()} | {error, no_connection}.
+-spec get_channel(atom()) -> {ok, pid()} | {error, no_connection}.
 get_channel(PoolName) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
     gen_server:call(RegName, get_channel).
 
 
--spec stop(pid()) -> ok.
-stop(Pid) ->
-    gen_server:call(Pid, stop).
+-spec stop(atom()) -> ok.
+stop(PoolName) ->
+    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
+    gen_server:call(RegName, stop).
 
 
 %%% gen_server API
@@ -62,9 +63,27 @@ handle_call(get_channel, _From, #state{connection = Conn, num_channels = PoolSiz
             {reply, {ok, Channel}, State#state{channels = queue:in(Channel, Channels2)}}
     end;
 
-handle_call(stop, _From, #state{channels = Channels} = State) ->
-    %% TODO
-    {stop, normal, ok, State#state{channels = queue:new()}};
+handle_call(stop, _From,
+    #state{
+        connection = Conn,
+        connection_ref = Ref,
+        channels = Channels}
+        = State) ->
+    ?log("~p:stop pid:~p, conn:~p, channels:~p", [?MODULE, self(), Conn, Channels]),
+    case Conn of
+        undefined -> do_nothing;
+        Pid ->
+            erlang:demonitor(Ref, [flush]),
+            fox_priv_utils:close_connection(Pid)
+    end,
+    lists:foreach(
+        fun(Channel) ->
+            ?log("close channel ~p", [Channel]),
+            fox_priv_utils:close_channel(Channel)
+        end,
+        queue:to_list(Channels)
+    ),
+    {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),

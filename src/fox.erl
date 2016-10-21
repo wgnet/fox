@@ -42,6 +42,7 @@ create_connection_pool(PoolName, Params) ->
 
 -spec create_connection_pool(pool_name(), #amqp_params_network{} | map(), integer()) -> ok.
 create_connection_pool(PoolName0, Params, PoolSize) ->
+    error_logger:info_msg("fox create pool ~p", [PoolName0]),
     ConnectionParams = fox_utils:map_to_params_network(Params),
     true = fox_utils:validate_params_network_types(ConnectionParams),
     PoolName = fox_utils:name_to_atom(PoolName0),
@@ -49,19 +50,21 @@ create_connection_pool(PoolName0, Params, PoolSize) ->
     ok.
 
 
--spec close_connection_pool(pool_name()) -> ok | {error, term()}.
+-spec close_connection_pool(pool_name()) -> ok | {error, not_found}.
 close_connection_pool(PoolName0) ->
-    ?log("### close_connection_pool ~p", [PoolName0]),
     PoolName = fox_utils:name_to_atom(PoolName0),
+    case fox_sup:pool_exists(PoolName) of
+        true ->
+            error_logger:info_msg("fox stop pool ~p", [PoolName0]),
 
-    %% TODO pool not found error
+            SubsMetas = fox_conn_pool:stop(PoolName),
+            lists:foreach(fun(#subs_meta{subs_worker = Pid}) -> fox_subs_worker:stop(Pid) end, SubsMetas),
 
-    SubsMetas = fox_conn_pool:get_all_subs_meta(PoolName),
-    ?log("SubsMetas:~p", [SubsMetas]),
-    lists:foreach(fun(#subs_meta{subs_worker = Pid}) -> fox_subs_worker:stop(Pid) end, SubsMetas),
-
-    %% fox_sup:stop_pool(PoolName),
-    ok.
+            fox_conn_sup:stop(PoolName),
+            fox_pub_pool:stop(PoolName),
+            fox_sup:stop_pool(PoolName);
+        false -> {error, not_found}
+    end.
 
 
 -spec get_channel(pool_name()) -> {ok, pid()} | {error, term()}.
@@ -267,7 +270,7 @@ test_run() ->
     create_connection_pool("test_pool", Params),
     qos("test_pool", #{prefetch_count => 10}),
     Q1 = #'basic.consume'{queue = <<"q_tp">>},
-    {ok, _Ref1} = subscribe("test_pool", Q1, sample_subs_callback, [<<"q_tp">>, <<"k_tp">>]),
+    {ok, Ref1} = subscribe("test_pool", Q1, sample_subs_callback, [<<"q_tp">>, <<"k_tp">>]),
 
     create_connection_pool("other_pool", Params),
     {ok, Ref2} = subscribe("other_pool", <<"q_op_1">>, sample_subs_callback, [<<"q_op_1">>, <<"k_op_1">>]),
@@ -281,16 +284,15 @@ test_run() ->
     publish("test_pool", <<"my_exchange">>, <<"k_op_2">>, <<"Hello 3">>),
     publish("other_pool", <<"my_exchange">>, <<"k_tp">>, <<"Hello 4">>),
 
-    %% timer:sleep(2000),
+    timer:sleep(2000),
     %% unsubscribe("test_pool", Ref1),
 
-    timer:sleep(2000),
-    unsubscribe("other_pool", Ref2),
+    %% timer:sleep(2000),
+    %% unsubscribe("other_pool", Ref2),
 
-    timer:sleep(2000),
-    unsubscribe("other_pool", Ref3),
+    %% timer:sleep(2000),
+    %% unsubscribe("other_pool", Ref3),
 
-    %% amqp_channel:close(PChannel),
-    %% close_connection_pool("other_pool"),
+    close_connection_pool("other_pool"),
 
     ok.

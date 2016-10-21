@@ -57,14 +57,15 @@ init(ConnParams) ->
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call(stop, _From, #state{connection = Conn, connection_ref = _Ref} = State) ->
+handle_call(stop, _From, #state{connection = Conn, connection_ref = Ref} = State) ->
+    ?log("~p:stop pid:~p conn:~p", [?MODULE, self(), Conn]),
     case Conn of
         undefined -> do_nothing;
         Pid ->
-            %% TODO unsubscribe and close all
+            erlang:demonitor(Ref, [flush]),
             fox_priv_utils:close_connection(Pid)
     end,
-    {stop, normal, ok, State#state{connection = undefined, connection_ref = undefined}};
+    {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),

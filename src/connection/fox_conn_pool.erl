@@ -6,7 +6,6 @@
     get_conn_worker/1,
     save_subs_meta/2,
     get_subs_meta/2,
-    get_all_subs_meta/1,
     remove_subs_meta/2,
     stop/1
 ]).
@@ -47,23 +46,16 @@ get_subs_meta(PoolName, Ref) ->
     gen_server:call(RegName, {get_subs_meta, Ref}).
 
 
--spec get_all_subs_meta(atom()) -> [#subs_meta{}].
-get_all_subs_meta(PoolName) ->
-    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
-    gen_server:call(RegName, get_all_subs_meta).
-
-
 -spec remove_subs_meta(atom(), reference()) -> ok.
 remove_subs_meta(PoolName, Ref) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
     gen_server:cast(RegName, {remove_subs_meta, Ref}).
 
 
--spec stop(pid()) -> ok.
-stop(_Pid) ->
-    %% TODO
-    %% gen_server:call(Pid, stop).
-    ok.
+-spec stop(atom()) -> [#subs_meta{}].
+stop(PoolName) ->
+    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
+    gen_server:call(RegName, stop).
 
 
 %%% gen_server API
@@ -97,9 +89,9 @@ handle_call({get_subs_meta, Ref}, _From, #state{subscriptions = SubsMap} = State
     end,
     {reply, Reply, State};
 
-handle_call(get_all_subs_meta, _From, #state{subscriptions = SubsMap} = State) ->
+handle_call(stop, _From, #state{subscriptions = SubsMap} = State) ->
     Reply = maps:values(SubsMap),
-    {reply, Reply, State};
+    {stop, normal, Reply, State};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
