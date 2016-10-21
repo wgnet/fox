@@ -38,17 +38,9 @@ init(Subs) ->
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call(stop, _From,
-    #subscription{
-        channel = Channel,
-        subs_module = Module,
-        subs_state = SubsState,
-        subs_tag = Tag}
-        = State) ->
-    fox_utils:channel_call(Channel, #'basic.cancel'{consumer_tag = Tag}),
-    Module:terminate(Channel, SubsState),
-    fox_priv_utils:close_channel(Channel),
-    {stop, normal, ok, State};
+handle_call(stop, _From, State) ->
+    State2 = unsubscribe(State),
+    {stop, normal, ok, State2};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
@@ -62,7 +54,10 @@ handle_cast({connection_established, Conn},
         subs_module = Module,
         subs_args = Args}
         = State) ->
+    ?log("~n connection_established ~p", [self()]),
+    State2 = unsubscribe(State),
     {ok, Channel} = amqp_connection:open_channel(Conn),
+    ?log("new channel ~p", [Channel]),
     {ok, SubsState} = Module:init(Channel, Args),
     BConsume = case Queue of
                    #'basic.consume'{} = B -> B;
@@ -71,7 +66,8 @@ handle_cast({connection_established, Conn},
                end,
     #'basic.consume_ok'{consumer_tag = Tag} =
         amqp_channel:subscribe(Channel, BConsume, self()),
-    {noreply, State#subscription{channel = Channel, subs_state = SubsState, subs_tag = Tag}};
+    ?log("new consumer_tag ~p", [Tag]),
+    {noreply, State2#subscription{channel = Channel, subs_state = SubsState, subs_tag = Tag}};
 
 
 handle_cast(Any, State) ->
@@ -113,3 +109,21 @@ handle(Msg,
         = State) ->
     {ok, SubsState2} = Module:handle(Msg, Channel, SubsState),
     State#subscription{subs_state = SubsState2}.
+
+
+%%% inner functions
+
+unsubscribe(#subscription{channel = undefined} = State) ->
+    ?log("~p unsubscribe, but no channel", [self()]),
+    State;
+unsubscribe(#subscription{
+    channel = Channel,
+    subs_module = Module,
+    subs_state = SubsState,
+    subs_tag = Tag}
+    = State) ->
+    ?log("~p unsubscribe, channel ~p", [self(), Channel]),
+    fox_utils:channel_call(Channel, #'basic.cancel'{consumer_tag = Tag}),
+    Module:terminate(Channel, SubsState),
+    fox_priv_utils:close_channel(Channel),
+    State#subscription{channel = undefined}.
