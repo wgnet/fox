@@ -54,10 +54,9 @@ handle_cast({connection_established, Conn},
         subs_module = Module,
         subs_args = Args}
         = State) ->
-    ?log("~n connection_established ~p", [self()]),
+    ?log("connection_established pid:~p, conn:~p", [self(), Conn]),
     State2 = unsubscribe(State),
     {ok, Channel} = amqp_connection:open_channel(Conn),
-    ?log("new channel ~p", [Channel]),
     {ok, SubsState} = Module:init(Channel, Args),
     BConsume = case Queue of
                    #'basic.consume'{} = B -> B;
@@ -66,7 +65,7 @@ handle_cast({connection_established, Conn},
                end,
     #'basic.consume_ok'{consumer_tag = Tag} =
         amqp_channel:subscribe(Channel, BConsume, self()),
-    ?log("new consumer_tag ~p", [Tag]),
+    ?log("subscribe pid:~p channel:~p tag:~p", [self(), Channel, Tag]),
     {noreply, State2#subscription{channel = Channel, subs_state = SubsState, subs_tag = Tag}};
 
 
@@ -114,7 +113,7 @@ handle(Msg,
 %%% inner functions
 
 unsubscribe(#subscription{channel = undefined} = State) ->
-    ?log("~p unsubscribe, but no channel", [self()]),
+    ?log("unsubscribe pid:~p, no channel", [self()]),
     State;
 unsubscribe(#subscription{
     channel = Channel,
@@ -122,7 +121,7 @@ unsubscribe(#subscription{
     subs_state = SubsState,
     subs_tag = Tag}
     = State) ->
-    ?log("~p unsubscribe, channel ~p", [self(), Channel]),
+    ?log("unsubscribe pid:~p, channel:~p, tag:~p", [self(), Channel, Tag]),
     fox_utils:channel_call(Channel, #'basic.cancel'{consumer_tag = Tag}),
     Module:terminate(Channel, SubsState),
     fox_priv_utils:close_channel(Channel),

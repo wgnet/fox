@@ -4,7 +4,10 @@
 -export([
     start_link/3,
     get_conn_worker/1,
-    save_subs_meta/2, get_subs_meta/2, remove_subs_meta/2,
+    save_subs_meta/2,
+    get_subs_meta/2,
+    get_all_subs_meta/1,
+    remove_subs_meta/2,
     stop/1
 ]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -42,6 +45,12 @@ save_subs_meta(PoolName, SubsMeta) ->
 get_subs_meta(PoolName, Ref) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
     gen_server:call(RegName, {get_subs_meta, Ref}).
+
+
+-spec get_all_subs_meta(atom()) -> [#subs_meta{}].
+get_all_subs_meta(PoolName) ->
+    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
+    gen_server:call(RegName, get_all_subs_meta).
 
 
 -spec remove_subs_meta(atom(), reference()) -> ok.
@@ -86,6 +95,10 @@ handle_call({get_subs_meta, Ref}, _From, #state{subscriptions = SubsMap} = State
         {ok, SubsMeta} -> SubsMeta;
         error -> not_found
     end,
+    {reply, Reply, State};
+
+handle_call(get_all_subs_meta, _From, #state{subscriptions = SubsMap} = State) ->
+    Reply = maps:values(SubsMap),
     {reply, Reply, State};
 
 handle_call(Any, _From, State) ->

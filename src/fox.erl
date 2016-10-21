@@ -51,8 +51,17 @@ create_connection_pool(PoolName0, Params, PoolSize) ->
 
 -spec close_connection_pool(pool_name()) -> ok | {error, term()}.
 close_connection_pool(PoolName0) ->
+    ?log("### close_connection_pool ~p", [PoolName0]),
     PoolName = fox_utils:name_to_atom(PoolName0),
-    fox_sup:stop_pool(PoolName).
+
+    %% TODO pool not found error
+
+    SubsMetas = fox_conn_pool:get_all_subs_meta(PoolName),
+    ?log("SubsMetas:~p", [SubsMetas]),
+    lists:foreach(fun(#subs_meta{subs_worker = Pid}) -> fox_subs_worker:stop(Pid) end, SubsMetas),
+
+    %% fox_sup:stop_pool(PoolName),
+    ok.
 
 
 -spec get_channel(pool_name()) -> {ok, pid()} | {error, term()}.
@@ -257,25 +266,31 @@ test_run() ->
 
     create_connection_pool("test_pool", Params),
     qos("test_pool", #{prefetch_count => 10}),
-    Q1 = #'basic.consume'{queue = <<"my_queue">>},
-    {ok, Ref1} = subscribe("test_pool", Q1, sample_subs_callback),
+    Q1 = #'basic.consume'{queue = <<"q_tp">>},
+    {ok, _Ref1} = subscribe("test_pool", Q1, sample_subs_callback, [<<"q_tp">>, <<"k_tp">>]),
 
     create_connection_pool("other_pool", Params),
-    Q2 = <<"other_queue">>,
-    {ok, _Ref2} = subscribe("other_pool", Q2, sample_subs_callback),
+    {ok, Ref2} = subscribe("other_pool", <<"q_op_1">>, sample_subs_callback, [<<"q_op_1">>, <<"k_op_1">>]),
+    {ok, Ref3} = subscribe("other_pool", <<"q_op_2">>, sample_subs_callback, [<<"q_op_2">>, <<"k_op_2">>]),
 
     timer:sleep(500),
 
     {ok, PChannel} = get_channel("test_pool"),
-    publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
-    publish(PChannel, <<"my_exchange">>, <<"my_key_2">>, <<"Hello!">>),
-    publish("test_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 3">>),
-    publish("other_pool", <<"my_exchange">>, <<"my_key">>, <<"Hello 4">>),
+    publish(PChannel, <<"my_exchange">>, <<"k_tp">>, <<"Hello 1">>),
+    publish(PChannel, <<"my_exchange">>, <<"k_op_1">>, <<"Hello 2">>),
+    publish("test_pool", <<"my_exchange">>, <<"k_op_2">>, <<"Hello 3">>),
+    publish("other_pool", <<"my_exchange">>, <<"k_tp">>, <<"Hello 4">>),
 
-%%    timer:sleep(1000),
+    %% timer:sleep(2000),
+    %% unsubscribe("test_pool", Ref1),
 
-%%    unsubscribe("test_pool", Ref1),
-%%    amqp_channel:close(PChannel),
-%%    close_connection_pool("test_pool"),
+    timer:sleep(2000),
+    unsubscribe("other_pool", Ref2),
+
+    timer:sleep(2000),
+    unsubscribe("other_pool", Ref3),
+
+    %% amqp_channel:close(PChannel),
+    %% close_connection_pool("other_pool"),
 
     ok.

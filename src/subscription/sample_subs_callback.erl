@@ -13,52 +13,53 @@
 -spec init(pid(), list()) -> {ok, state()}.
 init(Channel, Args) ->
     put('$module', ?MODULE),
-    error_logger:info_msg("sample_subs_callback:init channel:~p args:~p", [Channel, Args]),
+    error_logger:info_msg("sample_subs_callback:init pid:~p channel:~p args:~p", [self(), Channel, Args]),
 
     Exchange = <<"my_exchange">>,
-    Queue1 = <<"my_queue">>,
-    Queue2 = <<"other_queue">>,
-    RoutingKey1 = <<"my_key">>,
-    RoutingKey2 = <<"my_key_2">>,
+    [Q, RK] = Args,
 
     ok = fox:declare_exchange(Channel, Exchange),
 
-    #'queue.declare_ok'{} = fox:declare_queue(Channel, Queue1),
-    ok = fox:bind_queue(Channel, Queue1, Exchange, RoutingKey1),
+    #'queue.declare_ok'{} = fox:declare_queue(Channel, Q),
+    ok = fox:bind_queue(Channel, Q, Exchange, RK),
 
-    #'queue.declare_ok'{} = fox:declare_queue(Channel, Queue2),
-    ok = fox:bind_queue(Channel, Queue2, Exchange, RoutingKey2),
-
-    State = {Exchange, [{Queue1, RoutingKey1}, {Queue2, RoutingKey2}]},
+    State = {Exchange, Q, RK},
     {ok, State}.
 
 
 -spec handle(term(), pid(), state()) -> {ok, state()}.
-handle(#'basic.consume_ok'{} = Data, _Channel, State) ->
-    error_logger:info_msg("sample_subs_callback:handle basic.consume_ok, Data:~p", [Data]),
+handle(#'basic.consume_ok'{} = Data, Channel, State) ->
+    error_logger:info_msg(
+        "sample_subs_callback:handle basic.consume_ok pid:~p, channel:~p, Data:~p",
+        [self(), Channel, Data]),
     {ok, State};
 
 handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, Channel, State) ->
-    error_logger:info_msg("sample_subs_callback:handle basic.deliver, Payload:~p", [Payload]),
+    error_logger:info_msg(
+        "sample_subs_callback:handle basic.deliver pid:~p, channel:~p, Payload:~p",
+        [self(), Channel, Payload]),
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag}),
     {ok, State};
 
-handle(#'basic.cancel'{} = Data, _Channel, State) ->
-    error_logger:info_msg("sample_subs_callback:handle basic.cancel, Data:~p", [Data]),
+handle(#'basic.cancel'{} = Data, Channel, State) ->
+    error_logger:info_msg(
+        "sample_subs_callback:handle basic.cancel pid:~p, channel:~p, Data:~p",
+        [self(), Channel, Data]),
     {ok, State};
 
-handle(Data, _Channel, State) ->
-    error_logger:error_msg("sample_subs_callback:handle, unknown data:~p", [Data]),
+handle(Data, Channel, State) ->
+    error_logger:error_msg(
+        "sample_subs_callback:handle pid:~p, channel:~p, unknown data:~p",
+        [self(), Channel, Data]),
     {ok, State}.
 
 
 -spec terminate(pid(), state()) -> ok.
 terminate(Channel, State) ->
-    error_logger:info_msg("sample_subs_callback:terminate channel:~p, state:~p", [Channel, State]),
-    {Exchange, Bindings} = State,
-    lists:foreach(fun({Queue, RoutingKey}) ->
-                          fox:unbind_queue(Channel, Queue, Exchange, RoutingKey),
-                          fox:delete_queue(Channel, Queue)
-                  end, Bindings),
-    fox:delete_exchange(Channel, Exchange),
+    error_logger:info_msg(
+        "sample_subs_callback:terminate pid:~p, channel:~p state:~p",
+        [self(), Channel, State]),
+    {Exchange, Q, RK} = State,
+    fox:unbind_queue(Channel, Q, Exchange, RK),
+    fox:delete_queue(Channel, Q),
     ok.
