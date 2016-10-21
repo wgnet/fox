@@ -27,7 +27,7 @@ validate_params_network_test() ->
 create_channel_test() ->
     Params = setup(),
     fox:create_connection_pool("pool_1", Params),
-    {ok, Channel} = fox:create_channel("pool_1"),
+    {ok, Channel} = fox:get_channel("pool_1"),
     ?assertMatch({status, _}, erlang:process_info(Channel, status)),
     ?assertEqual(ok, amqp_channel:close(Channel)),
     fox:close_connection_pool("pool_1"),
@@ -37,7 +37,7 @@ create_channel_test() ->
 declare_exchange_test() ->
     Params = setup(),
     fox:create_connection_pool("pool_2", Params),
-    {ok, Channel} = fox:create_channel("pool_2"),
+    {ok, Channel} = fox:get_channel("pool_2"),
     ?assertEqual(ok, fox:declare_exchange(Channel, <<"my_exchange">>)),
     ?assertEqual(ok, fox:declare_exchange(Channel, <<"other_exchange">>, #{nowait => true})),
     ?assertEqual(ok, fox:delete_exchange(Channel, <<"my_exchange">>)),
@@ -50,7 +50,7 @@ declare_exchange_test() ->
 declare_queue_test() ->
     Params = setup(),
     fox:create_connection_pool("pool_3", Params),
-    {ok, Channel} = fox:create_channel("pool_3"),
+    {ok, Channel} = fox:get_channel("pool_3"),
     ?assertMatch(#'queue.declare_ok'{queue = <<"my_queue">>}, fox:declare_queue(Channel, <<"my_queue">>)),
     ?assertEqual(ok, fox:declare_queue(Channel, <<"other_queue">>, #{nowait => true})),
     ?assertMatch(#'queue.delete_ok'{}, fox:delete_queue(Channel, <<"my_queue">>)),
@@ -63,7 +63,7 @@ declare_queue_test() ->
 bind_queue_test() ->
     Params = setup(),
     fox:create_connection_pool("pool_4", Params),
-    {ok, Channel} = fox:create_channel("pool_4"),
+    {ok, Channel} = fox:get_channel("pool_4"),
 
     ?assertEqual(ok, fox:declare_exchange(Channel, <<"my_exchange">>)),
     ?assertMatch(#'queue.declare_ok'{}, fox:declare_queue(Channel, <<"my_queue">>)),

@@ -13,12 +13,12 @@ setup() ->
                                       username => <<"guest">>,
                                       password => <<"guest">>}).
 
-start_link_test() ->
+start_stop_test() ->
     Params = setup(),
-    Res = fox_conn_worker:start_link(Params),
-    ?assertMatch({ok, _}, Res),
-    {ok, Pid} = Res,
+    {ok, Pid} = fox_conn_worker:start_link(some_pool, 1, Params),
+
     ?assertMatch({status, _}, erlang:process_info(Pid, status)),
+    ?assertMatch(Pid, whereis('fox_conn_worker/some_pool/1')),
 
     ok = fox_conn_worker:stop(Pid),
     ?assertEqual(undefined, erlang:process_info(Pid, status)),

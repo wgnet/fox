@@ -2,7 +2,7 @@
 
 -include("fox.hrl").
 
--export([reconnect/1, close_connection/1, close_channel/1, close_subs/1, error_or_info/3]).
+-export([reconnect/1, close_connection/1, close_channel/1, error_or_info/3]).
 
 
 -spec reconnect(integer()) -> ok.
@@ -31,16 +31,6 @@ close_channel(Pid) ->
     catch
         exit:{noproc, _} -> ok; % channel may already be closed
         E:R -> error_logger:error_msg("can't close channel~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
-    end.
-
-
--spec close_subs(pid()) -> ok.
-close_subs(Pid) ->
-    try
-        fox_subs_router:stop(Pid), ok
-    catch
-        exit:{noproc, _} -> ok; % subscription may already be closed
-        E:R -> error_logger:error_msg("can't close subscription~n~p:~p~n~p", [E, R, erlang:get_stacktrace()])
     end.
 
 
