@@ -11,7 +11,6 @@
          declare_queue/2, declare_queue/3,
          delete_queue/2, delete_queue/3,
          bind_queue/4, bind_queue/5,
-
          unbind_queue/4, unbind_queue/5,
          publish/4, publish/5,
          qos/2,

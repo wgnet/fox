@@ -76,3 +76,15 @@ bind_queue_test() ->
     ?assertEqual(ok, amqp_channel:close(Channel)),
     fox:close_connection_pool("pool_4"),
     ok.
+
+
+qos_test() ->
+    Params = setup(),
+    fox:create_connection_pool("pool_5", Params),
+    {ok, Channel} = fox:get_channel("pool_5"),
+
+    ?assertEqual(ok, fox:qos("pool_5", #{prefetch_count => 10})),
+
+    ?assertEqual(ok, amqp_channel:close(Channel)),
+    fox:close_connection_pool("pool_5"),
+    ok.

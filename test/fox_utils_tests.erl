@@ -12,6 +12,14 @@ name_to_atom_test() ->
     ok.
 
 
+make_reg_name_test() ->
+    ?assertEqual('some/1', fox_utils:make_reg_name(some, 1)),
+    ?assertEqual('some/other', fox_utils:make_reg_name(some, "other")),
+    ?assertEqual('some/where', fox_utils:make_reg_name(some, where)),
+    ?assertEqual('some/1/2', fox_utils:make_reg_name(fox_utils:make_reg_name(some, 1), 2)),
+    ok.
+
+
 map_to_params_network_test() ->
     P1 = #{host => "localhost",
            port => 5672,
@@ -213,4 +221,34 @@ map_to_pbasic_test() ->
     P2 = #{priority => 5, user_id => 42, bla_bla_bla => 777},
     PB2 = #'P_basic'{priority = 5, user_id = 42},
     ?assertMatch(PB2, fox_utils:map_to_pbasic(P2)),
+    ok.
+
+
+map_to_basic_qos_test() ->
+    ?assertMatch(
+        #'basic.qos'{
+            prefetch_size = 0,
+            prefetch_count = 0,
+            global = false
+        },
+        fox_utils:map_to_basic_qos(#{})),
+    ?assertMatch(
+        #'basic.qos'{
+            prefetch_size = 10,
+            prefetch_count = 0,
+            global = false
+        },
+        fox_utils:map_to_basic_qos(#{prefetch_size => 10})),
+    ?assertMatch(
+        #'basic.qos'{
+            prefetch_size = 5,
+            prefetch_count = 5,
+            global = true
+        },
+        fox_utils:map_to_basic_qos(
+            #{
+                prefetch_size => 5,
+                prefetch_count => 5,
+                global => true
+            })),
     ok.
