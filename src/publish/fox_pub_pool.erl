@@ -117,10 +117,10 @@ handle_info(connect,
                 reconnect_attempt = Attempt + 1}}
     end;
 
-handle_info({'DOWN', Ref, process, Connection, Reason},
-    #state{connection = Connection, connection_ref = Ref} = State) ->
+handle_info({'DOWN', Ref, process, Conn, Reason},
+    #state{connection = Conn, connection_ref = Ref, reconnect_attempt = Attempt} = State) ->
     fox_priv_utils:error_or_info(Reason, "fox_pub_worker, connection is DOWN: ~p", [Reason]),
-    self() ! connect,
+    fox_priv_utils:reconnect(Attempt),
     {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
 handle_info(Request, State) ->
