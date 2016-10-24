@@ -55,11 +55,7 @@ close_connection_pool(PoolName0) ->
     case fox_sup:pool_exists(PoolName) of
         true ->
             error_logger:info_msg("fox stop pool ~p", [PoolName0]),
-
-            SubsMetas = fox_conn_pool:stop(PoolName),
-            lists:foreach(fun(#subs_meta{subs_worker = Pid}) -> fox_subs_worker:stop(Pid) end, SubsMetas),
-
-            fox_conn_sup:stop(PoolName),
+            fox_conn_pool:stop(PoolName),
             fox_pub_pool:stop(PoolName),
             fox_sup:stop_pool(PoolName);
         false -> {error, not_found}

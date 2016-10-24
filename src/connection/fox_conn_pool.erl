@@ -52,7 +52,7 @@ remove_subs_meta(PoolName, Ref) ->
     gen_server:cast(RegName, {remove_subs_meta, Ref}).
 
 
--spec stop(atom()) -> [#subs_meta{}].
+-spec stop(atom()) -> ok.
 stop(PoolName) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
     gen_server:call(RegName, stop).
@@ -89,9 +89,10 @@ handle_call({get_subs_meta, Ref}, _From, #state{subscriptions = SubsMap} = State
     end,
     {reply, Reply, State};
 
-handle_call(stop, _From, #state{subscriptions = SubsMap} = State) ->
-    Reply = maps:values(SubsMap),
-    {stop, normal, Reply, State};
+handle_call(stop, _From, #state{conn_workers = Queue, subscriptions = SubsMap} = State) ->
+    lists:foreach(fun(Pid) -> fox_conn_worker:stop(Pid) end, queue:to_list(Queue)),
+    lists:foreach(fun(#subs_meta{subs_worker = Pid}) -> fox_subs_worker:stop(Pid) end, maps:values(SubsMap)),
+    {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
     error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),

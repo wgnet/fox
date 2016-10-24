@@ -1,7 +1,7 @@
 -module(fox_conn_sup).
 -behaviour(supervisor).
 
--export([start_link/1, create_conn_worker/3, stop/1, init/1]).
+-export([start_link/1, create_conn_worker/3, init/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -25,16 +25,6 @@ create_conn_worker(PoolName, Id, ConnectionParams) ->
     },
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
     supervisor:start_child(RegName, Spec).
-
-
--spec stop(atom()) -> ok.
-stop(PoolName) ->
-    RegName = fox_utils:make_reg_name(?MODULE, PoolName),
-    lists:foreach(
-        fun({_, ChildPid, _, _}) ->
-            fox_conn_worker:stop(ChildPid)
-        end,
-        supervisor:which_children(RegName)).
 
 
 -spec init(gs_args()) -> sup_init_reply().
