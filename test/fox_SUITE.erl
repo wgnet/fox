@@ -14,19 +14,9 @@ all() ->
     [create_channel_test
     ,publish_test
     ,sync_publish_test
-    ,publish_pool_test
     ,subscribe_test
     ,subscribe_state_test
     ].
-
-
--record(state, {
-    connection :: pid(),
-    connection_ref :: reference(),
-    params_network :: #amqp_params_network{},
-    reconnect_attempt = 0 :: non_neg_integer(),
-    subscriptions_ets :: ets:tid()
-}).
 
 
 -spec init_per_suite(list()) -> list().
@@ -85,38 +75,19 @@ sync_publish_test(_Config) ->
     ok.
 
 
--spec publish_pool_test(list()) -> ok.
-publish_pool_test(_Config) ->
-    timer:sleep(200),
-    %% {ok, PoolPid} = fox_conn_pool_sup:get_publish_pool(publish_pool_test),
-
-%%    {state, publish_pool_test, 4, Channels} = sys:get_state(PoolPid),
-%%    ?assertEqual(0, queue:len(Channels)),
-%%
-%%    lists:map(
-%%        fun(NumChannels) ->
-%%            ok = fox:publish(publish_pool_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
-%%            {state, publish_pool_test, 4, Ch} = sys:get_state(PoolPid),
-%%            ?assertEqual(NumChannels, queue:len(Ch))
-%%        end,
-%%        [1, 2, 3, 4, 4, 4]),
-    ok.
-
-
 -spec subscribe_test(list()) -> ok.
 subscribe_test(_Config) ->
     T = ets:new(subscribe_test_ets, [public, named_table]),
     SortF = fun(I1, I2) -> element(1, I1) < element(1, I2) end,
 
-    {ok, _Ref} = fox:subscribe(subscribe_test, <<"my_queue">>, subscribe_test, "some args"),
+    {ok, Ref} = fox:subscribe(subscribe_test, <<"my_queue">>, subscribe_test, "some args"),
 
     timer:sleep(200),
     Res1 = lists:sort(SortF, ets:tab2list(T)),
     ct:log("Res1: ~p", [Res1]),
     ?assertMatch([{1, init, "some args"}], Res1),
 
-    {ok, PChannel} = fox:get_channel(subscribe_test),
-    fox:publish(PChannel, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
+    fox:publish(subscribe_test, <<"my_exchange">>, <<"my_key">>, <<"Hi there!">>),
     timer:sleep(200),
     Res2 = lists:sort(SortF, ets:tab2list(T)),
     ct:log("Res2: ~p", [Res2]),
@@ -137,73 +108,43 @@ subscribe_test(_Config) ->
                  ],
                  Res3),
 
-%% TODO not implemented
-%%    fox:unsubscribe(subscribe_test, Ref),
-%%    timer:sleep(200),
-%%    Res4 = lists:sort(SortF, ets:tab2list(T)),
-%%    ct:log("Res4: ~p", [Res4]),
-%%    ?assertMatch([
-%%                  {1, init, "some args"},
-%%                  {2, handle_basic_deliver, <<"Hi there!">>},
-%%                  {3, handle_basic_deliver, <<"Hello!">>},
-%%                  {4, terminate}
-%%                 ],
-%%                 Res4),
+    fox:unsubscribe(subscribe_test, Ref),
+    timer:sleep(200),
+    Res4 = lists:sort(SortF, ets:tab2list(T)),
+    ct:log("Res4: ~p", [Res4]),
+    ?assertMatch([
+                  {1, init, "some args"},
+                  {2, handle_basic_deliver, <<"Hi there!">>},
+                  {3, handle_basic_deliver, <<"Hello!">>},
+                  {4, terminate}
+                 ],
+                 Res4),
 
-    amqp_channel:close(PChannel),
     ets:delete(T),
     ok.
 
 
 -spec subscribe_state_test(list()) -> ok.
 subscribe_state_test(_Config) ->
-    {ok, Ref} = fox:subscribe(
-        subscribe_state_test,
-        [
-            <<"my_queue">>,
-            #'basic.consume'{queue = <<"other_queue">>}
-        ],
-        sample_subs_callback),
+    Q = #'basic.consume'{queue = <<"q">>},
+    {ok, Ref} = fox:subscribe(subscribe_state_test, Q, sample_subs_callback, [<<"q">>, <<"rk">>]),
 
-    ct:log("Ref:~p", [Ref]),
+    #subs_meta{conn_worker = ConnPid, subs_worker = SubsPid} =
+        fox_conn_pool:get_subs_meta(subscribe_state_test, Ref),
 
-    ConnectionWorkerPid = get_connection_worker(subscribe_state_test),
-    State = sys:get_state(ConnectionWorkerPid),
-    ct:log("State: ~p", [State]),
-    #state{subscriptions_ets = TID} = State,
+    ConnState = sys:get_state(ConnPid),
+    ct:log("ConnState: ~p", [ConnState]),
+    Subscribers = hd(lists:reverse(tuple_to_list(ConnState))),
+    ?assertEqual([SubsPid], Subscribers),
 
-    EtsData = lists:sort(ets:tab2list(TID)),
-    ct:log("EtsData: ~p", [EtsData]),
-    ?assertMatch([
-        #subscription{
-            subs_module = sample_subs_callback
-        }
-    ], EtsData),
-    ?assertMatch([
-        #subscription{
-            subs_module = sample_subs_callback
-        }
-    ], ets:lookup(TID, Ref)),
+    SubsState = sys:get_state(SubsPid),
+    ct:log("SubsState: ~p", [SubsState]),
+    ?assertMatch(#subscription{
+        queue = Q,
+        subs_module = sample_subs_callback,
+        subs_args = [<<"q">>, <<"rk">>],
+        subs_state = {<<"my_exchange">>, <<"q">>, <<"rk">>}
+    }, SubsState),
 
-    %% Unsubscribe
     fox:unsubscribe(subscribe_state_test, Ref),
-
-    timer:sleep(200),
-
-    ?assertEqual([], ets:tab2list(TID)),
     ok.
-
-
--spec get_connection_worker(atom()) -> pid().
-get_connection_worker(PoolName) ->
-    ConnectionSups = supervisor:which_children(fox_conn_pool_sup),
-    ConnectionSupPid = lists:foldl(fun({{fox_pub_channels_pool, _}, _, _, _}, Acc) -> Acc;
-                                      ({{fox_conn_sup, PName}, SupPid, _, _}, Acc) ->
-                                           case PName of
-                                               PoolName -> SupPid;
-                                               _ -> Acc
-                                           end
-                                   end, undefined, ConnectionSups),
-    ConnectionWorkers = supervisor:which_children(ConnectionSupPid),
-    {_, ConnectionWorkerPid, _, _} = hd(lists:reverse(ConnectionWorkers)),
-    ConnectionWorkerPid.

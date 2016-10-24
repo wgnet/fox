@@ -11,7 +11,6 @@
 
 -include("otp_types.hrl").
 -include("fox.hrl").
--include_lib("stdlib/include/ms_transform.hrl").
 
 -record(state, {
     connection :: pid(),
