@@ -1,4 +1,3 @@
 _build
-rebar.lock
 .idea
 erl_crash.dump

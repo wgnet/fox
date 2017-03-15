@@ -9,6 +9,8 @@
 
 -compile([export_all]).
 
+-define(DELAY, 500).
+
 -spec all() -> list().
 all() ->
     [
@@ -116,14 +118,14 @@ publish_test(_Config) ->
     Res = fox:publish(publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
     true = (Res == ok orelse Res == {error, no_connection}),
 
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ok = fox:publish(publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>),
     ok.
 
 
 -spec sync_publish_test(list()) -> ok.
 sync_publish_test(_Config) ->
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ok = fox:publish(sync_publish_test, <<"my_exchange">>, <<"my_queue">>, <<"Hello">>, #{synchronous => true}),
     ok.
 
@@ -137,12 +139,12 @@ subscribe_test(_Config) ->
     Args = {T, E, Q, RK},
     {ok, Ref} = fox:subscribe(subscribe_test, Q, subs_test_callback, Args),
 
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([{1, Q, init, Args}], get_subs_log(T)),
 
     fox:publish(subscribe_test, E, RK, <<"Hi there!">>),
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q, init, Args},
@@ -150,7 +152,7 @@ subscribe_test(_Config) ->
     ], get_subs_log(T)),
 
     fox:publish(subscribe_test, E, RK, <<"Hello!">>),
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q, init, Args},
@@ -159,7 +161,7 @@ subscribe_test(_Config) ->
     ], get_subs_log(T)),
 
     fox:unsubscribe(subscribe_test, Ref),
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q, init, Args},
@@ -182,7 +184,7 @@ subscribe_2_queues_test(_Config) ->
     Args1 = {T, E, Q1, K1},
     {ok, Ref1} = fox:subscribe(Pool, Q1, subs_test_callback, Args1),
 
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q1, init, Args1}
@@ -193,7 +195,7 @@ subscribe_2_queues_test(_Config) ->
     Args2 = {T, E, Q2, K2},
     {ok, Ref2} = fox:subscribe(Pool, Q2, subs_test_callback, Args2),
 
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q1, init, Args1},
@@ -201,7 +203,7 @@ subscribe_2_queues_test(_Config) ->
     ], get_subs_log(T)),
 
     fox:publish(Pool, E, K1, <<"Msg1 to K1">>),
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q1, init, Args1},
@@ -210,7 +212,7 @@ subscribe_2_queues_test(_Config) ->
     ], get_subs_log(T)),
 
     fox:publish(Pool, E, K2, <<"Msg2 to K2">>),
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q1, init, Args1},
@@ -220,7 +222,7 @@ subscribe_2_queues_test(_Config) ->
     ], get_subs_log(T)),
 
     fox:publish(Pool, E, K2, <<"Msg3 to K2">>),
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q1, init, Args1},
@@ -231,7 +233,7 @@ subscribe_2_queues_test(_Config) ->
     ], get_subs_log(T)),
 
     fox:publish(Pool, E, K1, <<"Msg4 to K1">>),
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q1, init, Args1},
@@ -244,7 +246,7 @@ subscribe_2_queues_test(_Config) ->
 
 
     fox:unsubscribe(Pool, Ref1),
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q1, init, Args1},
@@ -257,7 +259,7 @@ subscribe_2_queues_test(_Config) ->
     ], get_subs_log(T)),
 
     fox:unsubscribe(Pool, Ref2),
-    timer:sleep(200),
+    timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
         {1, Q1, init, Args1},

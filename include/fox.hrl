@@ -8,9 +8,9 @@
     queue :: subscribe_queue(),
     subs_module :: module(),
     subs_args :: list(),
-    channel :: pid(),
+    channel :: pid() | undefined,
     subs_state :: term(),
-    subs_tag :: binary()
+    subs_tag :: binary() | undefined
 }).
 
 -record(subs_meta, {

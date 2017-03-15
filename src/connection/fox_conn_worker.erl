@@ -13,8 +13,8 @@
 -include("fox.hrl").
 
 -record(state, {
-    connection :: pid(),
-    connection_ref :: reference(),
+    connection :: pid() | undefined,
+    connection_ref :: reference() | undefined,
     connection_params :: #amqp_params_network{},
     reconnect_attempt = 0 :: non_neg_integer(),
     subscribers = [] :: [pid()]
@@ -42,7 +42,11 @@ remove_subscriber(ConnWorkerPid, SubsWorkerPid) ->
 
 -spec stop(pid()) -> ok.
 stop(Pid) ->
-    gen_server:call(Pid, stop).
+    try
+        gen_server:call(Pid, stop)
+    catch
+        exit:{noproc, _} -> ok
+    end.
 
 
 %%% gen_server API

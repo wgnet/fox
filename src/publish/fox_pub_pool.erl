@@ -8,8 +8,8 @@
 -include("fox.hrl").
 
 -record(state, {
-    connection :: pid(),
-    connection_ref :: reference(),
+    connection :: pid() | undefined,
+    connection_ref :: reference() | undefined,
     connection_params :: #amqp_params_network{},
     reconnect_attempt = 0 :: non_neg_integer(),
     num_channels :: integer(),

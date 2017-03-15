@@ -26,7 +26,11 @@ connection_established(Pid, Conn) ->
 
 -spec stop(pid()) -> ok.
 stop(Pid) ->
-    gen_server:call(Pid, stop).
+    try
+        gen_server:call(Pid, stop)
+    catch
+        exit:{noproc, _} -> ok
+    end.
 
 
 %%% gen_server API

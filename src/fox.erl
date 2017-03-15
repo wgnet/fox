@@ -265,11 +265,11 @@ test_run() ->
     create_connection_pool("test_pool", Params),
     qos("test_pool", #{prefetch_count => 10}),
     Q1 = #'basic.consume'{queue = <<"q_tp">>},
-    {ok, Ref1} = subscribe("test_pool", Q1, sample_subs_callback, [<<"q_tp">>, <<"k_tp">>]),
+    {ok, _Ref1} = subscribe("test_pool", Q1, sample_subs_callback, [<<"q_tp">>, <<"k_tp">>]),
 
     create_connection_pool("other_pool", Params),
-    {ok, Ref2} = subscribe("other_pool", <<"q_op_1">>, sample_subs_callback, [<<"q_op_1">>, <<"k_op_1">>]),
-    {ok, Ref3} = subscribe("other_pool", <<"q_op_2">>, sample_subs_callback, [<<"q_op_2">>, <<"k_op_2">>]),
+    {ok, _Ref2} = subscribe("other_pool", <<"q_op_1">>, sample_subs_callback, [<<"q_op_1">>, <<"k_op_1">>]),
+    {ok, _Ref3} = subscribe("other_pool", <<"q_op_2">>, sample_subs_callback, [<<"q_op_2">>, <<"k_op_2">>]),
 
     timer:sleep(500),
 

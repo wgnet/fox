@@ -1,0 +1,12 @@
+{"1.1.0",
+[{<<"amqp_client">>,{pkg,<<"amqp_client">>,<<"3.6.7-pre.1">>},0},
+ {<<"herd">>,
+  {git,"https://github.com/wgnet/herd",
+       {ref,"7ef6954e13e854f32b02a2b97362458ed5208f8d"}},
+  0},
+ {<<"rabbit_common">>,{pkg,<<"rabbit_common">>,<<"3.6.7-pre.1">>},1}]}.
+[
+{pkg_hash,[
+ {<<"amqp_client">>, <<"5D689656443CF652A0114806E7E2F5C63CEAC4D768382FFA08570A246F0E8EAF">>},
+ {<<"rabbit_common">>, <<"CD8503E4176B5187E168C73D4F703AAF50DE4E2B49E8A71DF78370A8B6CF7D5B">>}]}
+].
