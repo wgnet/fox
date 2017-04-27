@@ -119,7 +119,7 @@ handle_info(connect,
 
 handle_info({'DOWN', Ref, process, Conn, Reason},
     #state{connection = Conn, connection_ref = Ref, reconnect_attempt = Attempt} = State) ->
-    fox_priv_utils:error_or_info(Reason, "fox_pub_worker, connection is DOWN: ~p", [Reason]),
+    fox_priv_utils:error_or_info(Reason, "fox_pub_pool, connection is DOWN: ~p", [Reason]),
     fox_priv_utils:reconnect(Attempt),
     {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
