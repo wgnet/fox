@@ -98,17 +98,18 @@ handle_info(connect,
         connection_params = Params, reconnect_attempt = Attempt,
         subscribers = Subscribers
     } = State) ->
+    SParams = fox_utils:params_network_to_str(Params),
     case amqp_connection:start(Params) of
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
+            error_logger:info_msg("fox_conn_worker connected to ~s", [SParams]),
             [fox_subs_worker:connection_established(Pid, Conn) || Pid <- Subscribers],
             {noreply, State#state{
                 connection = Conn,
                 connection_ref = Ref,
                 reconnect_attempt = 0}};
         {error, Reason} ->
-            error_logger:error_msg("fox_conn_worker could not connect to ~s ~p",
-                [fox_utils:params_network_to_str(Params), Reason]),
+            error_logger:error_msg("fox_conn_worker could not connect to ~s ~p", [SParams, Reason]),
             fox_priv_utils:reconnect(Attempt),
             {noreply, State#state{
                 connection = undefined,

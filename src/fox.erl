@@ -41,9 +41,10 @@ create_connection_pool(PoolName, Params) ->
 
 -spec create_connection_pool(pool_name(), #amqp_params_network{} | map(), integer()) -> ok.
 create_connection_pool(PoolName0, Params, PoolSize) ->
-    error_logger:info_msg("fox create pool ~p", [PoolName0]),
     ConnectionParams = fox_utils:map_to_params_network(Params),
     true = fox_utils:validate_params_network_types(ConnectionParams),
+    error_logger:info_msg("fox create pool ~p ~s",
+        [PoolName0, fox_utils:params_network_to_str(ConnectionParams)]),
     PoolName = fox_utils:name_to_atom(PoolName0),
     {ok, _} = fox_sup:start_pool(PoolName, ConnectionParams, PoolSize),
     ok.
