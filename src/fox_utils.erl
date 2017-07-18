@@ -218,36 +218,29 @@ map_to_basic_qos(Params) ->
     }.
 
 
--spec channel_call(pid(), term()) -> term().
+-spec channel_call(pid(), term()) -> ok | {error, atom()} | term().
 channel_call(ChannelPid, Method) ->
-    try amqp_channel:call(ChannelPid, Method) of
-        {error, Reason} -> {error, Reason};
-        Reply -> Reply
-    catch
-        exit:{noproc, _} -> {error, invalid_channel}
-    end.
+    channel_call(ChannelPid, Method, none).
 
 
--spec channel_call(pid(), term(), term()) -> term().
+-spec channel_call(pid(), term(), term()) -> ok | {error, atom()} | term().
 channel_call(ChannelPid, Method, Content) ->
     try amqp_channel:call(ChannelPid, Method, Content) of
-        {error, Reason} -> {error, Reason};
-        Reply -> Reply
+        ok -> ok;
+        blocked -> {error, blocked}; % server has throttled the client for flow control reasons
+        closing -> {error, closing}; % channel is in the process of shutting down
+        Reply -> Reply % #'exchange.declare_ok'{}, #'queue.bind_ok'{} etc
     catch
         exit:{noproc, _} -> {error, invalid_channel}
     end.
 
 
--spec channel_cast(pid(), term()) -> ok | {error, term()}.
+-spec channel_cast(pid(), term()) -> ok | {error, invalid_channel}.
 channel_cast(ChannelPid, Method) ->
-    try
-        amqp_channel:cast(ChannelPid, Method)
-    catch
-        exit:{noproc, _} -> {error, invalid_channel}
-    end.
+    channel_cast(ChannelPid, Method, none).
 
 
--spec channel_cast(pid(), term(), term()) -> ok | {error, term()}.
+-spec channel_cast(pid(), term(), term()) -> ok | {error, invalid_channel}.
 channel_cast(ChannelPid, Method, Content) ->
     try
         amqp_channel:cast(ChannelPid, Method, Content)

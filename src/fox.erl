@@ -211,7 +211,9 @@ publish(PoolOrChannel, Exchange, RoutingKey, Payload) ->
 
 
 -spec publish(pool_name() | pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
-publish(PoolOrChannel, Exchange, RoutingKey, Payload, Params) when is_binary(Payload) ->
+publish(Channel, Exchange, RoutingKey, Payload, Params)
+    when is_pid(Channel) andalso is_binary(Payload)
+    ->
     Publish = fox_utils:map_to_basic_publish(
         Params#{exchange => Exchange, routing_key => RoutingKey}),
     PBasic = fox_utils:map_to_pbasic(Params),
@@ -221,16 +223,18 @@ publish(PoolOrChannel, Exchange, RoutingKey, Payload, Params) when is_binary(Pay
                      #{synchronous := true} -> channel_call;
                      _ -> channel_cast
                  end,
-    if
-        is_pid(PoolOrChannel) ->
-            fox_utils:PublishFun(PoolOrChannel, Publish, Message),
-            ok;
-        true ->
-            PoolName = fox_utils:name_to_atom(PoolOrChannel),
-            case fox_pub_pool:get_channel(PoolName) of
-                {ok, Channel} -> fox_utils:PublishFun(Channel, Publish, Message), ok;
-                {error, Reason} -> {error, Reason}
-            end
+    case fox_utils:PublishFun(Channel, Publish, Message) of
+        ok -> ok;
+        {error, Reason} -> {error, Reason};
+        #'basic.publish'{} -> ok;
+        OtherReply -> {error, OtherReply}
+    end;
+
+publish(Pool, Exchange, RoutingKey, Payload, Params) ->
+    PoolName = fox_utils:name_to_atom(Pool),
+    case fox_pub_pool:get_channel(PoolName) of
+        {ok, Channel} -> publish(Channel, Exchange, RoutingKey, Payload, Params);
+        {error, Reason} -> {error, Reason}
     end.
 
 
@@ -275,10 +279,10 @@ test_run() ->
     timer:sleep(500),
 
     {ok, PChannel} = get_channel("test_pool"),
-    publish(PChannel, <<"my_exchange">>, <<"k_tp">>, <<"Hello 1">>),
-    publish(PChannel, <<"my_exchange">>, <<"k_op_1">>, <<"Hello 2">>),
-    publish("test_pool", <<"my_exchange">>, <<"k_op_2">>, <<"Hello 3">>),
-    publish("other_pool", <<"my_exchange">>, <<"k_tp">>, <<"Hello 4">>),
+    ok = publish(PChannel, <<"my_exchange">>, <<"k_tp">>, <<"Hello 1">>),
+    ok = publish(PChannel, <<"my_exchange">>, <<"k_op_1">>, <<"Hello 2">>),
+    ok = publish("test_pool", <<"my_exchange">>, <<"k_op_2">>, <<"Hello 3">>),
+    ok = publish("other_pool", <<"my_exchange">>, <<"k_tp">>, <<"Hello 4">>, #{synchronous => true}),
 
     timer:sleep(2000),
     %% unsubscribe("test_pool", Ref1),

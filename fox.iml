@@ -8,16 +8,13 @@
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
     <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/include" type="erlang-include" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/test" isTestSource="true" />
-      <excludeFolder url="file://$MODULE_DIR$/.idea" />
-      <excludeFolder url="file://$MODULE_DIR$/_build" />
     </content>
-    <orderEntry type="jdk" jdkName="Erlang 18" jdkType="Erlang SDK" />
+    <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="rabbit_common" level="project" />
-    <orderEntry type="library" name="herd" level="project" />
     <orderEntry type="library" name="amqp_client" level="project" />
+    <orderEntry type="library" name="rabbit_common" level="project" />
   </component>
 </module>
