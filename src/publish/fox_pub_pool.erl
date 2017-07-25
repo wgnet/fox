@@ -45,7 +45,7 @@ init(ConnectionParams) ->
     {ok, NumChannels} = application:get_env(fox, num_publish_channels),
     herd_rand:init_crypto(),
     self() ! connect,
-    {ok, #state{connection_params = ConnectionParams, num_channels = NumChannels, channels = queue:new()}}.
+    {ok, #state{connection_params = ConnectionParams, num_channels = NumChannels}}.
 
 
 -spec(handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply()).
@@ -108,7 +108,9 @@ handle_info(connect,
             {noreply, State#state{
                 connection = Conn,
                 connection_ref = Ref,
-                reconnect_attempt = 0}};
+                reconnect_attempt = 0,
+                channels = queue:new()
+            }};
         {error, Reason} ->
             error_logger:error_msg("fox_pub_pool could not connect to ~s ~p", [SParams, Reason]),
             fox_priv_utils:reconnect(Attempt),
@@ -119,10 +121,18 @@ handle_info(connect,
     end;
 
 handle_info({'DOWN', Ref, process, Conn, Reason},
-    #state{connection = Conn, connection_ref = Ref, reconnect_attempt = Attempt} = State) ->
+    #state{
+        connection = Conn, connection_ref = Ref,
+        reconnect_attempt = Attempt, channels = Channels
+    } = State) ->
+    lists:foreach(
+        fun(Channel) ->
+            fox_priv_utils:close_channel(Channel)
+        end,
+        queue:to_list(Channels)),
     fox_priv_utils:error_or_info(Reason, "fox_pub_pool, connection is DOWN: ~p", [Reason]),
     fox_priv_utils:reconnect(Attempt),
-    {noreply, State#state{connection = undefined, connection_ref = undefined}};
+    {noreply, State#state{connection = undefined, connection_ref = undefined, channels = undefined}};
 
 handle_info(Request, State) ->
     error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
