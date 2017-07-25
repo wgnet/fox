@@ -1,11 +1,11 @@
 # fox
 
-Client library for RabbitMQ build on top of [amqp_client](https://github.com/jbrisbin/amqp_client) (rebar-friendly fork).
+Client library for RabbitMQ build on top of [amqp_client](https://github.com/rabbitmq/rabbitmq-erlang-client).
 
 
 ## Connection Pool
 
-**fox** allows to create one or seleral connection pools, monitors connections inside pool and reconnects if needed.
+**fox** allows to create one or seleral connection pools, monitors connections inside pool and reconnects them if needed.
 
 **fox:create_connection_pool(PoolName, ConenctionParams)** creates pool with several connections (5 by default). PoolName should be _atom()_, _string()_ or _binary()_. ConnectionParams should be record [#amqp_params_network{}](https://github.com/jbrisbin/amqp_client/blob/master/include/amqp_client.hrl#L25) or _map()_ with the same fields.
 
