@@ -231,7 +231,8 @@ channel_call(ChannelPid, Method, Content) ->
         closing -> {error, closing}; % channel is in the process of shutting down
         Reply -> Reply % #'exchange.declare_ok'{}, #'queue.bind_ok'{} etc
     catch
-        exit:{noproc, _} -> {error, invalid_channel}
+        exit:{noproc, _} -> {error, invalid_channel};
+        exit:{{shutdown, Reason}, _} -> {error, {channel_closed, Reason}}
     end.
 
 
