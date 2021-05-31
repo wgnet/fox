@@ -1,12 +1,32 @@
-{"1.1.0",
-[{<<"amqp_client">>,{pkg,<<"amqp_client">>,<<"3.6.10">>},0},
+{"1.2.0",
+[{<<"amqp_client">>,{pkg,<<"amqp_client">>,<<"3.8.14">>},0},
+ {<<"credentials_obfuscation">>,
+  {pkg,<<"credentials_obfuscation">>,<<"2.4.0">>},
+  2},
+ {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},3},
  {<<"herd">>,
   {git,"https://github.com/wgnet/herd",
-       {ref,"7ef6954e13e854f32b02a2b97362458ed5208f8d"}},
+       {ref,"934847589dcf5a6d2b02a1f546ffe91c04066f17"}},
   0},
- {<<"rabbit_common">>,{pkg,<<"rabbit_common">>,<<"3.6.10">>},1}]}.
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"2.11.0">>},2},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.8.2">>},2},
+ {<<"rabbit_common">>,{pkg,<<"rabbit_common">>,<<"3.8.14">>},1},
+ {<<"recon">>,{pkg,<<"recon">>,<<"2.5.1">>},2}]}.
 [
 {pkg_hash,[
- {<<"amqp_client">>, <<"F26FBACCA4E71F58EBA1A57746E5F10598550AA46E89BC67060DA6AD1A6D95D5">>},
- {<<"rabbit_common">>, <<"2217845381350258C5714C22905EC197AF0C4DD38EB3B6A5DDBF55C5BD93F127">>}]}
+ {<<"amqp_client">>, <<"7569517AEFB47E0D1C41BCA2F4768DC8A2D88487DAF7819FECCA0D78943F293C">>},
+ {<<"credentials_obfuscation">>, <<"9FB57683B84899CA3546B384E59AB5D3054A9F334EBA50D74C82CD0AE82DD6CA">>},
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
+ {<<"jsx">>, <<"08154624050333919B4AC1B789667D5F4DB166DC50E190C4D778D1587F102EE0">>},
+ {<<"lager">>, <<"B180B814FD8B7082B6CA8AAF287E55A908D304CFC7A240D32F4DB2D07092B7D0">>},
+ {<<"rabbit_common">>, <<"CC1604891295CD82F34597F1526AC611EA7B6A0E57B3DD79B41CB4224BCC6EC5">>},
+ {<<"recon">>, <<"430FFA60685AC1EFDFB1FE4C97B8767C92D0D92E6E7C3E8621559BA77598678A">>}]},
+{pkg_hash_ext,[
+ {<<"amqp_client">>, <<"E5BA3AC18ABBE34A1D990A6BCAC25633DC7061AB8F8D101C7DCFF97F49F4C523">>},
+ {<<"credentials_obfuscation">>, <<"D28A89830E30698B075DE9A4DBE683A20685C6BED1E3B7DF744A0C06E6FF200A">>},
+ {<<"goldrush">>, <<"99CB4128CFFCB3227581E5D4D803D5413FA643F4EB96523F77D9E6937D994CEB">>},
+ {<<"jsx">>, <<"EED26A0D04D217F9EECEFFFB89714452556CF90EB38F290A27A4D45B9988F8C0">>},
+ {<<"lager">>, <<"73329CE700410B423F64AAFC5F94583073904899098E4461F3558ED2980462AB">>},
+ {<<"rabbit_common">>, <<"27409E425413CDD3FC2C077CF08226C4A307D56B1467883F26AB3789B2E106D0">>},
+ {<<"recon">>, <<"5721C6B6D50122D8F68CCCAC712CAA1231F97894BAB779EFF5FF0F886CB44648">>}]}
 ].
