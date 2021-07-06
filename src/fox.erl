@@ -21,7 +21,8 @@
 
 %%% module API
 
--spec validate_params_network(#amqp_params_network{} | map()) -> ok | {error, term()}.
+-spec validate_params_network(Params :: #amqp_params_network{} | map()) ->
+    ok | {error, Reason :: term()}.
 validate_params_network(Params) when is_map(Params) ->
     validate_params_network(fox_utils:map_to_params_network(Params));
 
@@ -33,13 +34,16 @@ validate_params_network(Params) ->
     end.
 
 
--spec create_connection_pool(pool_name(), #amqp_params_network{} | map()) -> ok.
+-spec create_connection_pool(pool_name(),
+                             Params :: #amqp_params_network{} | map()) -> ok.
 create_connection_pool(PoolName, Params) ->
     {ok, PoolSize} = application:get_env(fox, connection_pool_size),
     create_connection_pool(PoolName, Params, PoolSize).
 
 
--spec create_connection_pool(pool_name(), #amqp_params_network{} | map(), integer()) -> ok.
+-spec create_connection_pool(pool_name(),
+                             Params :: #amqp_params_network{} | map(),
+                             PoolSize :: integer()) -> ok.
 create_connection_pool(PoolName0, Params, PoolSize) ->
     ConnectionParams = fox_utils:map_to_params_network(Params),
     true = fox_utils:validate_params_network_types(ConnectionParams),
@@ -63,18 +67,20 @@ close_connection_pool(PoolName0) ->
     end.
 
 
--spec get_channel(pool_name()) -> {ok, pid()} | {error, term()}.
+-spec get_channel(pool_name()) -> {ok, pid()} | {error, Reason :: term()}.
 get_channel(PoolName0) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
     fox_pub_pool:get_channel(PoolName).
 
 
--spec subscribe(pool_name(), subscribe_queue(), module()) -> {ok, reference()} | {error, term()}.
+-spec subscribe(pool_name(), subscribe_queue(), module()) ->
+    {ok, SubscriptionReference :: reference()} | {error, Reason :: term()}.
 subscribe(PoolName, Queue, SubsModule) ->
     subscribe(PoolName, Queue, SubsModule, []).
 
 
--spec subscribe(pool_name(), subscribe_queue(), module(), list()) -> {ok, reference()}.
+-spec subscribe(pool_name(), subscribe_queue(), module(), list()) ->
+    {ok, SubscriptionReference :: reference()}.
 subscribe(PoolName0, Queue, SubsModule, SubsArgs) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
 
@@ -96,7 +102,8 @@ subscribe(PoolName0, Queue, SubsModule, SubsArgs) ->
     {ok, SubsMeta#subs_meta.ref}.
 
 
--spec unsubscribe(pool_name(), reference()) -> ok | {error, term()}.
+-spec unsubscribe(pool_name(), SubscriptionReference :: reference()) ->
+    ok | {error, Reason :: term()}.
 unsubscribe(PoolName0, Ref) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
     case fox_conn_pool:get_subs_meta(PoolName, Ref) of
@@ -109,12 +116,14 @@ unsubscribe(PoolName0, Ref) ->
     end.
 
 
--spec declare_exchange(pid(), binary()) -> ok | {error, term()}.
+-spec declare_exchange(Channel :: pid(), Name :: binary()) ->
+    ok | {error, Reason :: term()}.
 declare_exchange(ChannelPid, Name) when is_binary(Name) ->
     declare_exchange(ChannelPid, Name, maps:new()).
 
 
--spec declare_exchange(pid(), binary(), map()) -> ok | {error, term()}.
+-spec declare_exchange(Channel :: pid(), Name :: binary(), Params :: map()) ->
+    ok | {error, Reason :: term()}.
 declare_exchange(ChannelPid, Name, Params) ->
     ExchangeDeclare = fox_utils:map_to_exchange_declare(Params),
     ExchangeDeclare2 = ExchangeDeclare#'exchange.declare'{exchange = Name},
@@ -124,12 +133,14 @@ declare_exchange(ChannelPid, Name, Params) ->
         {error, Reason} -> {error, Reason}
     end.
 
--spec delete_exchange(pid(), binary()) -> ok | {error, term()}.
+-spec delete_exchange(Channel :: pid(),  Name :: binary()) ->
+    ok | {error, Reason :: term()}.
 delete_exchange(ChannelPid, Name) when is_binary(Name) ->
     delete_exchange(ChannelPid, Name, maps:new()).
 
 
--spec delete_exchange(pid(), binary(), map()) -> ok | {error, term()}.
+-spec delete_exchange(Channel :: pid(), Name :: binary(), Params :: map()) ->
+    ok | {error, Reason :: term()}.
 delete_exchange(ChannelPid, Name, Params) ->
     ExchangeDelete = fox_utils:map_to_exchange_delete(Params),
     ExchangeDelete2 = ExchangeDelete#'exchange.delete'{exchange = Name},
@@ -139,12 +150,14 @@ delete_exchange(ChannelPid, Name, Params) ->
     end.
 
 
--spec declare_queue(pid(), binary()) -> ok | #'queue.declare_ok'{} | {error, term()}.
+-spec declare_queue(Channel :: pid(), Name :: binary()) ->
+    ok | #'queue.declare_ok'{} | {error, Reason :: term()}.
 declare_queue(ChannelPid, Name) when is_binary(Name) ->
     declare_queue(ChannelPid, Name, maps:new()).
 
 
--spec declare_queue(pid(), binary(), map()) -> ok | #'queue.declare_ok'{} | {error, term()}.
+-spec declare_queue(Channel :: pid(), Name :: binary(), Params :: map()) ->
+    ok | #'queue.declare_ok'{} | {error, Reason :: term()}.
 declare_queue(ChannelPid, Name, Params) ->
     QueueDeclare = fox_utils:map_to_queue_declare(Params),
     QueueDeclare2 = QueueDeclare#'queue.declare'{queue = Name},
@@ -155,12 +168,14 @@ declare_queue(ChannelPid, Name, Params) ->
     end.
 
 
--spec delete_queue(pid(), binary()) -> #'queue.delete_ok'{} | {error, term()}.
+-spec delete_queue(Channel :: pid(), Name :: binary()) ->
+    #'queue.delete_ok'{} | {error, Reason :: term()}.
 delete_queue(ChannelPid, Name) when is_binary(Name) ->
     delete_queue(ChannelPid, Name, maps:new()).
 
 
--spec delete_queue(pid(), binary(), map()) -> #'queue.delete_ok'{} | {error, term()}.
+-spec delete_queue(Channel :: pid(), Name :: binary(), Params :: map()) ->
+    #'queue.delete_ok'{} | {error, Reason :: term()}.
 delete_queue(ChannelPid, Name, Params) ->
     QueueDelete = fox_utils:map_to_queue_delete(Params),
     QueueDelete2 = QueueDelete#'queue.delete'{queue = Name},
@@ -171,12 +186,19 @@ delete_queue(ChannelPid, Name, Params) ->
     end.
 
 
--spec bind_queue(pid(), binary(), binary(), binary()) -> ok | {error, term()}.
+-spec bind_queue(Channel :: pid(),
+                 QueueName :: binary(),
+                 ExchangeName :: binary(),
+                 RoutingKey :: binary()) -> ok | {error, Reason :: term()}.
 bind_queue(ChannelPid, Queue, Exchange, RoutingKey) ->
     bind_queue(ChannelPid, Queue, Exchange, RoutingKey, maps:new()).
 
 
--spec bind_queue(pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
+-spec bind_queue(Channel :: pid(),
+                 QueueName :: binary(),
+                 ExchangeName :: binary(),
+                 RoutingKey :: binary(),
+                 Params :: map()) -> ok | {error, Reason :: term()}.
 bind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
     QueueBind = fox_utils:map_to_queue_bind(Params),
     QueueBind2 = QueueBind#'queue.bind'{queue = Queue,
@@ -188,12 +210,19 @@ bind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
     end.
 
 
--spec unbind_queue(pid(), binary(), binary(), binary()) -> ok | {error, term()}.
+-spec unbind_queue(Channel :: pid(),
+                   QueueName :: binary(),
+                   ExchangeName :: binary(),
+                   RoutingKey :: binary()) -> ok | {error, Reason :: term()}.
 unbind_queue(ChannelPid, Queue, Exchange, RoutingKey) ->
     unbind_queue(ChannelPid, Queue, Exchange, RoutingKey, maps:new()).
 
 
--spec unbind_queue(pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
+-spec unbind_queue(Channel :: pid(),
+                   QueueName :: binary(),
+                   ExchangeName :: binary(),
+                   RoutingKey :: binary(),
+                   Params :: map()) -> ok | {error, Reason :: term()}.
 unbind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
     QueueUnbind = fox_utils:map_to_queue_unbind(Params),
     QueueUnbind2 = QueueUnbind#'queue.unbind'{queue = Queue,
@@ -205,12 +234,19 @@ unbind_queue(ChannelPid, Queue, Exchange, RoutingKey, Params) ->
     end.
 
 
--spec publish(pool_name() | pid(), binary(), binary(), binary()) -> ok | {error, term()}.
+-spec publish(PoolOrChannel :: pool_name() | pid(),
+              ExchangeName :: binary(),
+              RoutingKey :: binary(),
+              Payload :: binary()) -> ok | {error, Reason :: term()}.
 publish(PoolOrChannel, Exchange, RoutingKey, Payload) ->
     publish(PoolOrChannel, Exchange, RoutingKey, Payload, maps:new()).
 
 
--spec publish(pool_name() | pid(), binary(), binary(), binary(), map()) -> ok | {error, term()}.
+-spec publish(PoolOrChannel :: pool_name() | pid(),
+              Exchange :: binary(),
+              RoutingKey :: binary(),
+              Payload :: binary(),
+              Params :: map()) -> ok | {error, Reason :: term()}.
 publish(Channel, Exchange, RoutingKey, Payload, Params)
     when is_pid(Channel) andalso is_binary(Payload)
     ->
@@ -238,7 +274,8 @@ publish(Pool, Exchange, RoutingKey, Payload, Params) ->
     end.
 
 
--spec qos(pool_name() | pid(), map()) -> ok | {error, term()}.
+-spec qos(PoolOrChannel :: pool_name() | pid(),
+          Params :: map()) -> ok | {error, Reason :: term()}.
 qos(PoolOrChannel, Params) ->
     QoS = fox_utils:map_to_basic_qos(Params),
     if
