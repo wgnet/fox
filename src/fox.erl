@@ -8,6 +8,7 @@
          subscribe/3, subscribe/4, unsubscribe/2,
          declare_exchange/2, declare_exchange/3,
          delete_exchange/2, delete_exchange/3,
+         bind_exchange/4, bind_exchange/5,
          declare_queue/2, declare_queue/3,
          delete_queue/2, delete_queue/3,
          bind_queue/4, bind_queue/5,
@@ -146,6 +147,35 @@ delete_exchange(ChannelPid, Name, Params) ->
     ExchangeDelete2 = ExchangeDelete#'exchange.delete'{exchange = Name},
     case fox_utils:channel_call(ChannelPid, ExchangeDelete2) of
         #'exchange.delete_ok'{} -> ok;
+        {error, Reason} -> {error, Reason}
+    end.
+
+
+-spec bind_exchange(Channel :: pid(),
+                    ExchangeSource :: binary(),
+                    ExchangeDestination :: binary(),
+                    RoutingKey :: binary()) -> ok | {error, Reason :: term()}.
+bind_exchange(ChannelPid, Source, Destination, RoutingKey) ->
+    bind_exchange(ChannelPid, Source, Destination, RoutingKey, maps:new()).
+
+
+-spec bind_exchange(Channel :: pid(),
+                    ExchangeSource :: binary(),
+                    ExchangeDestination :: binary(),
+                    RoutingKey :: binary(),
+                    Params :: map()) -> ok | {error, Reason :: term()}.
+bind_exchange(ChannelPid, Source, Destination, RoutingKey, Params) ->
+    ExchangeBind = fox_utils:map_to_exchange_bind(Params),
+
+    ExchangeBind2 = ExchangeBind#'exchange.bind'{
+        destination = Destination,
+        source = Source,
+        routing_key = RoutingKey
+    },
+
+    case fox_utils:channel_call(ChannelPid, ExchangeBind2) of
+        #'exchange.bind_ok'{} -> ok;
+        ok -> ok;
         {error, Reason} -> {error, Reason}
     end.
 

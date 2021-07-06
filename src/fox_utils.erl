@@ -7,6 +7,7 @@
          validate_params_network_types/1,
          map_to_exchange_declare/1,
          map_to_exchange_delete/1,
+         map_to_exchange_bind/1,
          map_to_queue_declare/1,
          map_to_queue_delete/1,
          map_to_queue_bind/1,
@@ -118,6 +119,15 @@ map_to_exchange_declare(Params) ->
        nowait = maps:get(nowait, Params, false),
        arguments = maps:get(arguments, Params, [])
       }.
+
+
+-spec map_to_exchange_bind(map()) -> #'exchange.bind'{}.
+map_to_exchange_bind(Params) ->
+    #'exchange.bind'{
+       ticket = maps:get(ticket, Params, 0),
+       nowait = maps:get(nowait, Params, false),
+       arguments = maps:get(arguments, Params, [])
+    }.
 
 
 -spec map_to_exchange_delete(map()) -> #'exchange.delete'{}.
@@ -248,5 +258,3 @@ channel_cast(ChannelPid, Method, Content) ->
     catch
         exit:{noproc, _} -> {error, invalid_channel}
     end.
-
-
