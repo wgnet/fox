@@ -2,7 +2,7 @@
 {application, fox,
  [
   {description, "Client lib for RabbitMQ"},
-  {vsn, "2.1.0"},
+  {vsn, "2.4.0"},
   {registered, []},
   {applications, [kernel, stdlib, amqp_client]},
   {mod, {fox_app, []}},
@@ -12,5 +12,6 @@
          {max_reconnect_timeout, 5000},
          {min_reconnect_timeout, 100},
          {num_publish_channels, 20}
-        ]}
+        ]},
+  {licenses, ["MIT"]}
  ]}.
