@@ -2,3 +2,4 @@ _build
 .idea
 erl_crash.dump
 log
+ebin
