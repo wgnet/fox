@@ -17,7 +17,8 @@
     connection_ref :: reference() | undefined,
     connection_params :: #amqp_params_network{},
     reconnect_attempt = 0 :: non_neg_integer(),
-    subscribers = [] :: [pid()]
+    subscribers = [] :: [pid()],
+    registered_name :: atom()
 }).
 
 
@@ -27,7 +28,7 @@
 start_link(PoolName, Id, ConnParams) ->
     RegName0 = fox_utils:make_reg_name(?MODULE, PoolName),
     RegName = fox_utils:make_reg_name(RegName0, Id),
-    gen_server:start_link({local, RegName}, ?MODULE, ConnParams, []).
+    gen_server:start_link({local, RegName}, ?MODULE, {RegName, ConnParams}, []).
 
 
 -spec register_subscriber(pid(), pid()) -> ok.
@@ -52,11 +53,11 @@ stop(Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(ConnParams) ->
+init({RegName, ConnParams}) ->
     put('$module', ?MODULE),
     herd_rand:init_crypto(),
     self() ! connect,
-    {ok, #state{connection_params = ConnParams}}.
+    {ok, #state{connection_params = ConnParams, registered_name = RegName}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
@@ -96,20 +97,21 @@ handle_info(connect,
     #state{
         connection = undefined, connection_ref = undefined,
         connection_params = Params, reconnect_attempt = Attempt,
-        subscribers = Subscribers
+        subscribers = Subscribers,
+        registered_name = RegName
     } = State) ->
     SParams = fox_utils:params_network_to_str(Params),
     case amqp_connection:start(Params) of
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
-            error_logger:info_msg("fox_conn_worker connected to ~s", [SParams]),
+            error_logger:info_msg("~s connected to ~s", [RegName, SParams]),
             [fox_subs_worker:connection_established(Pid, Conn) || Pid <- Subscribers],
             {noreply, State#state{
                 connection = Conn,
                 connection_ref = Ref,
                 reconnect_attempt = 0}};
         {error, Reason} ->
-            error_logger:error_msg("fox_conn_worker could not connect to ~s ~p", [SParams, Reason]),
+            error_logger:error_msg("~s could not connect to ~s ~p", [RegName, SParams, Reason]),
             fox_priv_utils:reconnect(Attempt),
             {noreply, State#state{
                 connection = undefined,
@@ -118,8 +120,13 @@ handle_info(connect,
     end;
 
 handle_info({'DOWN', Ref, process, Conn, Reason},
-            #state{connection = Conn, connection_ref = Ref, reconnect_attempt = Attempt} = State) ->
-    fox_priv_utils:error_or_info(Reason, "fox_conn_worker, connection is DOWN: ~p", [Reason]),
+            #state{
+                connection = Conn,
+                connection_ref = Ref,
+                reconnect_attempt = Attempt,
+                registered_name = RegName
+            } = State) ->
+    fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~p", [RegName, Reason]),
     fox_priv_utils:reconnect(Attempt),
     {noreply, State#state{connection = undefined, connection_ref = undefined}};
 
@@ -137,4 +144,3 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), term(), term()) -> gs_code_change_reply().
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
-
