@@ -44,7 +44,6 @@ stop(PoolName) ->
 init({RegName, ConnectionParams}) ->
     put('$module', ?MODULE),
     {ok, NumChannels} = application:get_env(fox, num_publish_channels),
-    herd_rand:init_crypto(),
     self() ! connect,
     {
         ok,

@@ -3,10 +3,6 @@
  {<<"credentials_obfuscation">>,
   {pkg,<<"credentials_obfuscation">>,<<"2.4.0">>},
   2},
- {<<"herd">>,
-  {git,"https://github.com/wgnet/herd",
-       {ref,"934847589dcf5a6d2b02a1f546ffe91c04066f17"}},
-  0},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"3.1.0">>},2},
  {<<"rabbit_common">>,{pkg,<<"rabbit_common">>,<<"3.9.11">>},1},
  {<<"recon">>,{pkg,<<"recon">>,<<"2.5.1">>},2}]}.

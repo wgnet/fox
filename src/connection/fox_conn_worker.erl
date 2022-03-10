@@ -55,7 +55,6 @@ stop(Pid) ->
 -spec init(gs_args()) -> gs_init_reply().
 init({RegName, ConnParams}) ->
     put('$module', ?MODULE),
-    herd_rand:init_crypto(),
     self() ! connect,
     {ok, #state{connection_params = ConnParams, registered_name = RegName}}.
 
