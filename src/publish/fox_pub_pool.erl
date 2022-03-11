@@ -13,7 +13,8 @@
     connection_params :: #amqp_params_network{},
     reconnect_attempt = 0 :: non_neg_integer(),
     num_channels :: integer(),
-    channels :: queue:queue()
+    channels :: queue:queue(),
+    registered_name :: atom()
 }).
 
 
@@ -22,7 +23,7 @@
 -spec start_link(atom(), #amqp_params_network{}) -> gs_start_link_reply().
 start_link(PoolName, ConnectionParams) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
-    gen_server:start_link({local, RegName}, ?MODULE, ConnectionParams, []).
+    gen_server:start_link({local, RegName}, ?MODULE, {RegName, ConnectionParams}, []).
 
 
 -spec get_channel(atom()) -> {ok, pid()} | {error, no_connection}.
@@ -40,12 +41,18 @@ stop(PoolName) ->
 %%% gen_server API
 
 -spec(init(gs_args()) -> gs_init_reply()).
-init(ConnectionParams) ->
+init({RegName, ConnectionParams}) ->
     put('$module', ?MODULE),
     {ok, NumChannels} = application:get_env(fox, num_publish_channels),
-    herd_rand:init_crypto(),
     self() ! connect,
-    {ok, #state{connection_params = ConnectionParams, num_channels = NumChannels}}.
+    {
+        ok,
+        #state{
+            connection_params = ConnectionParams,
+            num_channels = NumChannels,
+            registered_name = RegName
+        }
+    }.
 
 
 -spec(handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply()).
@@ -97,14 +104,17 @@ handle_cast(Any, State) ->
 -spec(handle_info(gs_request(), gs_state()) -> gs_info_reply()).
 handle_info(connect,
     #state{
-        connection = undefined, connection_ref = undefined,
-        connection_params = Params, reconnect_attempt = Attempt
+        connection = undefined,
+        connection_ref = undefined,
+        connection_params = Params,
+        reconnect_attempt = Attempt,
+        registered_name = RegName
     } = State) ->
     SParams = fox_utils:params_network_to_str(Params),
     case amqp_connection:start(Params) of
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
-            error_logger:info_msg("fox_pub_pool connected to ~s", [SParams]),
+            error_logger:info_msg("~s connected to ~s", [RegName, SParams]),
             {noreply, State#state{
                 connection = Conn,
                 connection_ref = Ref,
@@ -112,7 +122,7 @@ handle_info(connect,
                 channels = queue:new()
             }};
         {error, Reason} ->
-            error_logger:error_msg("fox_pub_pool could not connect to ~s ~p", [SParams, Reason]),
+            error_logger:error_msg("~s could not connect to ~s ~p", [RegName, SParams, Reason]),
             fox_priv_utils:reconnect(Attempt),
             {noreply, State#state{
                 connection = undefined,
@@ -122,15 +132,18 @@ handle_info(connect,
 
 handle_info({'DOWN', Ref, process, Conn, Reason},
     #state{
-        connection = Conn, connection_ref = Ref,
-        reconnect_attempt = Attempt, channels = Channels
+        connection = Conn,
+        connection_ref = Ref,
+        reconnect_attempt = Attempt,
+        channels = Channels,
+        registered_name = RegName
     } = State) ->
     lists:foreach(
         fun(Channel) ->
             fox_priv_utils:close_channel(Channel)
         end,
         queue:to_list(Channels)),
-    fox_priv_utils:error_or_info(Reason, "fox_pub_pool, connection is DOWN: ~p", [Reason]),
+    fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~p", [RegName, Reason]),
     fox_priv_utils:reconnect(Attempt),
     {noreply, State#state{connection = undefined, connection_ref = undefined, channels = undefined}};
 
@@ -147,5 +160,3 @@ terminate(_Reason, _State) ->
 -spec(code_change(term(), term(), term()) -> gs_code_change_reply()).
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
-
-

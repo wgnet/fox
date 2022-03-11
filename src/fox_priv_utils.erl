@@ -9,7 +9,7 @@
 reconnect(Attempt) ->
     {ok, MaxTimeout} = application:get_env(fox, max_reconnect_timeout),
     {ok, MinTimeout} = application:get_env(fox, min_reconnect_timeout),
-    Timeout = herd_reconnect:exp_backoff(Attempt, MinTimeout, MaxTimeout),
+    Timeout = exp_backoff(Attempt, MinTimeout, MaxTimeout),
     erlang:send_after(Timeout, self(), connect),
     ok.
 
@@ -41,3 +41,18 @@ error_or_info(normal, ErrMsg, Params) ->
 error_or_info(_, ErrMsg, Params) ->
     error_logger:error_msg(ErrMsg, Params).
 
+
+-spec exp_backoff(integer(), integer(), integer()) -> integer().
+exp_backoff(Attempt, BaseTimeout, MaxTimeout) ->
+    exp_backoff(Attempt, 10, BaseTimeout, MaxTimeout).
+
+
+-spec exp_backoff(integer(), integer(), integer(), integer()) -> integer().
+exp_backoff(Attempt, MaxAttempt, _BaseTimeout, MaxTimeout) when Attempt >= MaxAttempt ->
+    Half = MaxTimeout div 2,
+    Half + rand:uniform(Half);
+
+exp_backoff(Attempt, _MaxAttempt, BaseTimeout, MaxTimeout) ->
+    Timeout = min(erlang:round(math:pow(2, Attempt) * BaseTimeout), MaxTimeout),
+    Half = Timeout div 2,
+    Half + rand:uniform(Half).
