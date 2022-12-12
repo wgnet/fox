@@ -60,15 +60,8 @@ handle_call(get_channel, _From, #state{connection = undefined} = State) ->
     {reply, {error, no_connection}, State};
 
 handle_call(get_channel, _From, #state{connection = Conn, num_channels = PoolSize, channels = Channels} = State) ->
-    NumChannels = queue:len(Channels),
-    if
-        NumChannels < PoolSize ->
-            {ok, Channel} = amqp_connection:open_channel(Conn),
-            {reply, {ok, Channel}, State#state{channels = queue:in(Channel, Channels)}};
-        true ->
-            {{value, Channel}, Channels2} = queue:out(Channels),
-            {reply, {ok, Channel}, State#state{channels = queue:in(Channel, Channels2)}}
-    end;
+    {Channel, Channels1} = handle_get_channel(Channels, PoolSize, Conn),
+    {reply, {ok, Channel}, State#state{channels = Channels1}};
 
 handle_call(stop, _From,
     #state{
@@ -160,3 +153,30 @@ terminate(_Reason, _State) ->
 -spec(code_change(term(), term(), term()) -> gs_code_change_reply()).
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
+
+
+%% internal functions
+
+-spec handle_get_channel(queue:queue(pid()), pos_integer(), pid()) -> {pid(), queue:queue(pid())}.
+handle_get_channel(Channels, PoolSize, Connection) ->
+    NumChannels = queue:len(Channels),
+
+    {Channel1, Channels2} = case NumChannels < PoolSize of
+        true ->
+            {ok, Channel} = amqp_connection:open_channel(Connection),
+            {Channel, Channels};
+        false ->
+            {{value, Channel}, Channels1} = queue:out(Channels),
+            {Channel, Channels1}
+    end,
+
+    case is_process_alive(Channel1) of
+        true ->
+            {Channel1, queue:in(Channel1, Channels2)};
+        false ->
+            error_logger:info_msg(
+                "Fox channel ~p seems to be dead. Drop it and create new",
+                [Channel1]
+            ),
+            handle_get_channel(Channels2, PoolSize, Connection)
+    end.
