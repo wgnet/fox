@@ -12,15 +12,6 @@
 -include("otp_types.hrl").
 -include("fox.hrl").
 
--record(state, {
-    connection :: pid() | undefined,
-    connection_ref :: reference() | undefined,
-    connection_params :: #amqp_params_network{},
-    reconnect_attempt = 0 :: non_neg_integer(),
-    subscribers = [] :: [pid()],
-    registered_name :: atom()
-}).
-
 
 %%% module API
 
@@ -56,11 +47,11 @@ stop(Pid) ->
 init({RegName, ConnParams}) ->
     put('$module', ?MODULE),
     self() ! connect,
-    {ok, #state{connection_params = ConnParams, registered_name = RegName}}.
+    {ok, #conn_worker_state{connection_params = ConnParams, registered_name = RegName}}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call(stop, _From, #state{connection = Conn, connection_ref = Ref} = State) ->
+handle_call(stop, _From, #conn_worker_state{connection = Conn, connection_ref = Ref} = State) ->
     case Conn of
         undefined -> do_nothing;
         Pid ->
@@ -75,16 +66,16 @@ handle_call(Any, _From, State) ->
 
 
 -spec handle_cast(gs_request(), gs_state()) -> gs_cast_reply().
-handle_cast({register_subscriber, Pid}, #state{connection = Conn, subscribers = Subs} = State) ->
+handle_cast({register_subscriber, Pid}, #conn_worker_state{connection = Conn, subscribers = Subs} = State) ->
     case Conn of
         undefined -> do_nothing;
         _ -> fox_subs_worker:connection_established(Pid, Conn)
     end,
-    {noreply, State#state{subscribers = [Pid | Subs]}};
+    {noreply, State#conn_worker_state{subscribers = [Pid | Subs]}};
 
-handle_cast({remove_subscriber, Pid}, #state{subscribers = Subs} = State) ->
+handle_cast({remove_subscriber, Pid}, #conn_worker_state{subscribers = Subs} = State) ->
     Subs2 = lists:delete(Pid, Subs),
-    {noreply, State#state{subscribers = Subs2}};
+    {noreply, State#conn_worker_state{subscribers = Subs2}};
 
 handle_cast(Any, State) ->
     error_logger:error_msg("unknown cast ~p in ~p ~n", [Any, ?MODULE]),
@@ -93,7 +84,7 @@ handle_cast(Any, State) ->
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
 handle_info(connect,
-    #state{
+    #conn_worker_state{
         connection = undefined, connection_ref = undefined,
         connection_params = Params, reconnect_attempt = Attempt,
         subscribers = Subscribers,
@@ -105,21 +96,21 @@ handle_info(connect,
             Ref = erlang:monitor(process, Conn),
             error_logger:info_msg("~s connected to ~s", [RegName, SParams]),
             [fox_subs_worker:connection_established(Pid, Conn) || Pid <- Subscribers],
-            {noreply, State#state{
+            {noreply, State#conn_worker_state{
                 connection = Conn,
                 connection_ref = Ref,
                 reconnect_attempt = 0}};
         {error, Reason} ->
             error_logger:error_msg("~s could not connect to ~s ~p", [RegName, SParams, Reason]),
             fox_priv_utils:reconnect(Attempt),
-            {noreply, State#state{
+            {noreply, State#conn_worker_state{
                 connection = undefined,
                 connection_ref = undefined,
                 reconnect_attempt = Attempt + 1}}
     end;
 
 handle_info({'DOWN', Ref, process, Conn, Reason},
-            #state{
+            #conn_worker_state{
                 connection = Conn,
                 connection_ref = Ref,
                 reconnect_attempt = Attempt,
@@ -127,7 +118,7 @@ handle_info({'DOWN', Ref, process, Conn, Reason},
             } = State) ->
     fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~p", [RegName, Reason]),
     fox_priv_utils:reconnect(Attempt),
-    {noreply, State#state{connection = undefined, connection_ref = undefined}};
+    {noreply, State#conn_worker_state{connection = undefined, connection_ref = undefined}};
 
 
 handle_info(Request, State) ->

@@ -60,6 +60,7 @@ handle_cast({connection_established, Conn},
         = State) ->
     State2 = unsubscribe(State),
     {ok, Channel} = amqp_connection:open_channel(Conn),
+    %% Ref = erlang:monitor(process, Channel),
     {ok, SubsState} = Module:init(Channel, Args),
     BConsume = case Queue of
                    #'basic.consume'{} = B -> B;

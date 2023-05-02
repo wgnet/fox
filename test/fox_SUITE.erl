@@ -7,6 +7,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
+-compile(nowarn_export_all).
 -compile([export_all]).
 
 -define(DELAY, 500).
@@ -286,7 +287,7 @@ subscribe_state_test(_Config) ->
 
     ConnState = sys:get_state(ConnPid),
     ct:log("ConnState: ~p", [ConnState]),
-    Subscribers = hd(lists:reverse(tuple_to_list(ConnState))),
+    #conn_worker_state{subscribers = Subscribers} = ConnState,
     ?assertEqual([SubsPid], Subscribers),
 
     SubsState = sys:get_state(SubsPid),

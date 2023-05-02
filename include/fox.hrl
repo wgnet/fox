@@ -4,11 +4,21 @@
 -type(queue_name() :: binary()).
 -type(subscribe_queue() :: queue_name() | #'basic.consume'{}).
 
+-record(conn_worker_state, {
+    connection :: pid() | undefined,
+    connection_ref :: reference() | undefined,
+    connection_params :: #amqp_params_network{},
+    reconnect_attempt = 0 :: non_neg_integer(),
+    subscribers = [] :: [pid()],
+    registered_name :: atom()
+}).
+
 -record(subscription, {
     queue :: subscribe_queue(),
     subs_module :: module(),
     subs_args :: list(),
     channel :: pid() | undefined,
+    channel_ref :: reference() | undefined,
     subs_state :: term(),
     subs_tag :: binary() | undefined
 }).
