@@ -14,6 +14,7 @@
 }).
 
 -record(subscription, {
+    connection :: pid() | undefined,
     queue :: subscribe_queue(),
     subs_module :: module(),
     subs_args :: list(),
