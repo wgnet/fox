@@ -119,7 +119,12 @@ handle_info({'DOWN', Ref, process, Channel, Reason},
                 queue = Queue
             } = State) ->
     fox_priv_utils:error_or_info(Reason, "fox_subs_worker for queue ~0p, channel is DOWN: ~0p", [Queue, Reason]),
-    connection_established(self(), Conn),
+
+    ConnectionAlive = is_process_alive(Conn),
+    if
+        ConnectionAlive -> connection_established(self(), Conn);
+        true -> do_nothing
+    end,
     {noreply, State#subscription{channel = undefined, channel_ref = undefined}};
 
 handle_info(Request, State) ->
