@@ -61,7 +61,7 @@ handle_call(stop, _From, #conn_worker_state{connection = Conn, connection_ref = 
     {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
-    error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
+    error_logger:error_msg("unknown call ~0p in ~0p", [Any, ?MODULE]),
     {noreply, State}.
 
 
@@ -78,7 +78,7 @@ handle_cast({remove_subscriber, Pid}, #conn_worker_state{subscribers = Subs} = S
     {noreply, State#conn_worker_state{subscribers = Subs2}};
 
 handle_cast(Any, State) ->
-    error_logger:error_msg("unknown cast ~p in ~p ~n", [Any, ?MODULE]),
+    error_logger:error_msg("unknown cast ~0p in ~0p", [Any, ?MODULE]),
     {noreply, State}.
 
 
@@ -94,14 +94,14 @@ handle_info(connect,
     case amqp_connection:start(Params) of
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
-            error_logger:info_msg("~s connected to ~s", [RegName, SParams]),
+            error_logger:info_msg("~0p connected to ~0p", [RegName, SParams]),
             [fox_subs_worker:connection_established(Pid, Conn) || Pid <- Subscribers],
             {noreply, State#conn_worker_state{
                 connection = Conn,
                 connection_ref = Ref,
                 reconnect_attempt = 0}};
         {error, Reason} ->
-            error_logger:error_msg("~s could not connect to ~s ~p", [RegName, SParams, Reason]),
+            error_logger:error_msg("~0p could not connect to ~0p ~0p", [RegName, SParams, Reason]),
             fox_priv_utils:reconnect(Attempt),
             {noreply, State#conn_worker_state{
                 connection = undefined,
@@ -116,13 +116,13 @@ handle_info({'DOWN', Ref, process, Conn, Reason},
                 reconnect_attempt = Attempt,
                 registered_name = RegName
             } = State) ->
-    fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~p", [RegName, Reason]),
+    fox_priv_utils:error_or_info(Reason, "~0p, connection is DOWN: ~0p", [RegName, Reason]),
     fox_priv_utils:reconnect(Attempt),
     {noreply, State#conn_worker_state{connection = undefined, connection_ref = undefined}};
 
 
 handle_info(Request, State) ->
-    error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
+    error_logger:error_msg("unknown info ~0p in ~0p", [Request, ?MODULE]),
     {noreply, State}.
 
 

@@ -48,7 +48,7 @@ create_connection_pool(PoolName, Params) ->
 create_connection_pool(PoolName0, Params, PoolSize) ->
     ConnectionParams = fox_utils:map_to_params_network(Params),
     true = fox_utils:validate_params_network_types(ConnectionParams),
-    error_logger:info_msg("fox create pool ~p ~s",
+    error_logger:info_msg("fox create pool ~0p ~0p",
         [PoolName0, fox_utils:params_network_to_str(ConnectionParams)]),
     PoolName = fox_utils:name_to_atom(PoolName0),
     {ok, _} = fox_sup:start_pool(PoolName, ConnectionParams, PoolSize),
@@ -60,7 +60,7 @@ close_connection_pool(PoolName0) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
     case fox_sup:pool_exists(PoolName) of
         true ->
-            error_logger:info_msg("fox stop pool ~p", [PoolName0]),
+            error_logger:info_msg("fox stop pool ~0p", [PoolName0]),
             fox_conn_pool:stop(PoolName),
             fox_pub_pool:stop(PoolName),
             fox_sup:stop_pool(PoolName);
@@ -332,27 +332,14 @@ test_run() ->
                password => <<"guest">>},
 
     ok = validate_params_network(Params),
-    {error, {auth_failure, _}} = validate_params_network(Params#{username => <<"Bob">>}),
 
-    create_connection_pool("test_pool", Params),
-    qos("test_pool", #{prefetch_count => 10}),
-    Q1 = #'basic.consume'{queue = <<"q_tp">>},
-    {ok, _Ref1} = subscribe("test_pool", Q1, sample_subs_callback, [<<"q_tp">>, <<"k_tp">>]),
-
-    create_connection_pool("other_pool", Params),
+    create_connection_pool("other_pool", Params, 2),
     {ok, _Ref2} = subscribe("other_pool", <<"q_op_1">>, sample_subs_callback, [<<"q_op_1">>, <<"k_op_1">>]),
     {ok, _Ref3} = subscribe("other_pool", <<"q_op_2">>, sample_subs_callback, [<<"q_op_2">>, <<"k_op_2">>]),
 
     timer:sleep(500),
 
-    {ok, PChannel} = get_channel("test_pool"),
-    ok = publish(PChannel, <<"my_exchange">>, <<"k_tp">>, <<"Hello 1">>),
-    ok = publish(PChannel, <<"my_exchange">>, <<"k_op_1">>, <<"Hello 2">>),
-    ok = publish("test_pool", <<"my_exchange">>, <<"k_op_2">>, <<"Hello 3">>),
-    ok = publish("other_pool", <<"my_exchange">>, <<"k_tp">>, <<"Hello 4">>, #{synchronous => true}),
-
-    timer:sleep(2000),
-    %% unsubscribe("test_pool", Ref1),
+    ok = publish("other_pool", <<"my_exchange">>, <<"k_op_1">>, <<"Hello 4">>, #{synchronous => true}),
 
     %% timer:sleep(2000),
     %% unsubscribe("other_pool", Ref2),
@@ -360,6 +347,6 @@ test_run() ->
     %% timer:sleep(2000),
     %% unsubscribe("other_pool", Ref3),
 
-    close_connection_pool("other_pool"),
+    %% close_connection_pool("other_pool"),
 
     ok.

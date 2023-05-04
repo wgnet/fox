@@ -95,7 +95,7 @@ handle_call(stop, _From, #state{conn_workers = Queue, subscriptions = SubsMap} =
     {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
-    error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
+    error_logger:error_msg("unknown call ~0p in ~0p", [Any, ?MODULE]),
     {noreply, State}.
 
 
@@ -105,13 +105,13 @@ handle_cast({remove_subs_meta, Ref}, #state{subscriptions = SubsMap} = State) ->
     {noreply, State#state{subscriptions = SubsMap2}};
 
 handle_cast(Any, State) ->
-    error_logger:error_msg("unknown cast ~p in ~p ~n", [Any, ?MODULE]),
+    error_logger:error_msg("unknown cast ~0p in ~0p", [Any, ?MODULE]),
     {noreply, State}.
 
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
 handle_info(Request, State) ->
-    error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
+    error_logger:error_msg("unknown info ~0p in ~0p", [Request, ?MODULE]),
     {noreply, State}.
 
 

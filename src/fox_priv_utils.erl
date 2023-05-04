@@ -20,7 +20,7 @@ close_connection(Pid) ->
         amqp_connection:close(Pid), ok
     catch
         exit:{noproc, _} -> ok; % connection may already be closed
-        E:R -> error_logger:error_msg("can't close connection~n~p:~p", [E, R])
+        E:R -> error_logger:error_msg("can't close connection ~0p:~0p", [E, R])
     end.
 
 
@@ -30,7 +30,7 @@ close_channel(Pid) ->
         amqp_channel:close(Pid), ok
     catch
         exit:{noproc, _} -> ok; % channel may already be closed
-        E:R:StackTrace -> error_logger:error_msg("can't close channel~n~p:~p~n~p", [E, R, StackTrace])
+        E:R:StackTrace -> error_logger:error_msg("can't close channel ~0p:~0p ~0p", [E, R, StackTrace])
     end.
 
 

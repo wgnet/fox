@@ -84,13 +84,13 @@ handle_call(stop, _From,
     {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
-    error_logger:error_msg("unknown call ~p in ~p ~n", [Any, ?MODULE]),
+    error_logger:error_msg("unknown call ~0p in ~0p", [Any, ?MODULE]),
     {noreply, State}.
 
 
 -spec(handle_cast(gs_request(), gs_state()) -> gs_cast_reply()).
 handle_cast(Any, State) ->
-    error_logger:error_msg("unknown cast ~p in ~p ~n", [Any, ?MODULE]),
+    error_logger:error_msg("unknown cast ~0p in ~0p", [Any, ?MODULE]),
     {noreply, State}.
 
 
@@ -107,7 +107,7 @@ handle_info(connect,
     case amqp_connection:start(Params) of
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
-            error_logger:info_msg("~s connected to ~s", [RegName, SParams]),
+            error_logger:info_msg("~0p connected to ~0p", [RegName, SParams]),
             {noreply, State#state{
                 connection = Conn,
                 connection_ref = Ref,
@@ -115,7 +115,7 @@ handle_info(connect,
                 channels = queue:new()
             }};
         {error, Reason} ->
-            error_logger:error_msg("~s could not connect to ~s ~p", [RegName, SParams, Reason]),
+            error_logger:error_msg("~0p could not connect to ~0p ~0p", [RegName, SParams, Reason]),
             fox_priv_utils:reconnect(Attempt),
             {noreply, State#state{
                 connection = undefined,
@@ -136,12 +136,12 @@ handle_info({'DOWN', Ref, process, Conn, Reason},
             fox_priv_utils:close_channel(Channel)
         end,
         queue:to_list(Channels)),
-    fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~p", [RegName, Reason]),
+    fox_priv_utils:error_or_info(Reason, "~0p, connection is DOWN: ~0p", [RegName, Reason]),
     fox_priv_utils:reconnect(Attempt),
     {noreply, State#state{connection = undefined, connection_ref = undefined, channels = undefined}};
 
 handle_info(Request, State) ->
-    error_logger:error_msg("unknown info ~p in ~p ~n", [Request, ?MODULE]),
+    error_logger:error_msg("unknown info ~0p in ~0p", [Request, ?MODULE]),
     {noreply, State}.
 
 
@@ -175,7 +175,7 @@ handle_get_channel(Channels, PoolSize, Connection) ->
             {Channel1, queue:in(Channel1, Channels2)};
         false ->
             error_logger:info_msg(
-                "Fox channel ~p seems to be dead. Drop it and create new",
+                "Fox channel ~0p seems to be dead. Drop it and create new",
                 [Channel1]
             ),
             handle_get_channel(Channels2, PoolSize, Connection)
