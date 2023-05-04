@@ -36,48 +36,44 @@ stop(Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(#subscription{queue = Queue} = State) ->
-    error_logger:info_msg("fox_subs_worker for queue ~0p init", [Queue]),
+init(#subscription{} = State) ->
+    logger:info("~s init", [worker_name(State)]),
     put('$module', ?MODULE),
     {ok, State}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
-handle_call(stop, _From, #subscription{queue = Queue, channel = Channel, channel_ref = Ref} = State) ->
-    error_logger:info_msg("fox_subs_worker for queue ~0p stops", [Queue]),
+handle_call(stop, _From, #subscription{channel = Channel, channel_ref = Ref} = State) ->
     case Channel of
         undefined -> do_nothing;
         _ -> erlang:demonitor(Ref)
     end,
     State2 = unsubscribe(State),
+    logger:info("~s stop", [worker_name(State)]),
     {stop, normal, ok, State2#subscription{channel_ref = undefined}};
 
 handle_call(Any, _From, State) ->
-    error_logger:error_msg("unknown call ~0p in ~0p ~n", [Any, ?MODULE]),
+    logger:error("unknown call ~w in ~p", [Any, ?MODULE]),
     {noreply, State}.
 
 
 -spec handle_cast(gs_request(), gs_state()) -> gs_cast_reply().
 handle_cast({connection_established, Conn},
     #subscription{
-        queue = Queue,
+        basic_consume = BasicConsume,
         subs_module = Module,
         subs_args = Args}
         = State) ->
     State2 = unsubscribe(State),
     case amqp_connection:open_channel(Conn) of
         {ok, Channel} -> 
+            logger:info("~s subscribe to queue", [worker_name(State)]),
+
             Ref = erlang:monitor(process, Channel),
             {ok, SubsState} = Module:init(Channel, Args),
-            BConsume = 
-                case Queue of
-                    #'basic.consume'{} = B -> B;
-                    QueueName when is_binary(QueueName) ->
-                        #'basic.consume'{queue = QueueName}
-                end,
+
             #'basic.consume_ok'{consumer_tag = Tag} =
-                amqp_channel:subscribe(Channel, BConsume, self()),
-            error_logger:info_msg("fox_subs_worker subscribed to queue ~0p", [Queue]),
+                amqp_channel:subscribe(Channel, BasicConsume, self()),
 
             {noreply, State2#subscription{
                         connection = Conn,
@@ -86,13 +82,13 @@ handle_cast({connection_established, Conn},
                         subs_state = SubsState, 
                         subs_tag = Tag}};
         Other -> 
-            error_logger:info_msg("fox_subs_worker can't subscribe to queue ~0p, reason: ~0p", [Queue, Other]),
+            logger:info("~s can't subscribe to queue, reason: ~w", [worker_name(State), Other]),
             {noreply, State2}
     end;
 
 
 handle_cast(Any, State) ->
-    error_logger:error_msg("unknown cast ~0p in ~0p ~n", [Any, ?MODULE]),
+    logger:error("unknown cast ~w in ~p", [Any, ?MODULE]),
     {noreply, State}.
 
 
@@ -106,19 +102,17 @@ handle_info({#'basic.deliver'{}, #amqp_msg{}} = Msg, State) ->
 handle_info(#'basic.cancel'{} = Msg, State) ->
     {noreply, handle(Msg, State)};
 
-handle_info({'DOWN', _Ref, process, _Channel, normal},
-            #subscription{queue = Queue} = State) ->
-    error_logger:error_msg("fox_subs_worker for queue ~0p, channel closed", [Queue]),
+handle_info({'DOWN', _Ref, process, _Channel, normal}, State) ->
+    logger:error("~s channel closed", [State]),
     {noreply, State#subscription{channel = undefined, channel_ref = undefined}};
 
 handle_info({'DOWN', Ref, process, Channel, Reason},
             #subscription{
                 connection = Conn,
                 channel = Channel,
-                channel_ref = Ref,
-                queue = Queue
+                channel_ref = Ref
             } = State) ->
-    fox_priv_utils:error_or_info(Reason, "fox_subs_worker for queue ~0p, channel is DOWN: ~0p", [Queue, Reason]),
+    fox_priv_utils:error_or_info(Reason, "~s, channel is DOWN: ~0p", [worker_name(State), Reason]),
 
     ConnectionAlive = is_process_alive(Conn),
     if
@@ -128,13 +122,13 @@ handle_info({'DOWN', Ref, process, Channel, Reason},
     {noreply, State#subscription{channel = undefined, channel_ref = undefined}};
 
 handle_info(Request, State) ->
-    error_logger:error_msg("unknown info ~0p in ~0p ~n", [Request, ?MODULE]),
+    logger:error("unknown info ~w in ~p", [Request, ?MODULE]),
     {noreply, State}.
 
 
 -spec terminate(terminate_reason(), gs_state()) -> ok.
-terminate(Reason, #subscription{queue = Queue}) ->
-    fox_priv_utils:error_or_info(Reason, "fox_subs_worker for queue ~0p is terminated with reason ~0p", [Queue, Reason]),
+terminate(Reason, State) ->
+    fox_priv_utils:error_or_info(Reason, "~s terminated with reason ~w", [worker_name(State), Reason]),
     ok.
 
 
@@ -156,6 +150,10 @@ handle(Msg,
 
 %%% inner functions
 
+worker_name(#subscription{basic_consume = BasicConsume}) ->
+    #'basic.consume'{queue = Name} = BasicConsume,
+    <<"fox_subs_worker ", Name/binary>>.
+
 unsubscribe(#subscription{channel = undefined} = State) ->
     State;
 unsubscribe(#subscription{
@@ -164,6 +162,7 @@ unsubscribe(#subscription{
     subs_state = SubsState,
     subs_tag = Tag}
     = State) ->
+    logger:info("~s unsubscribe from queue", [worker_name(State)]),
     fox_utils:channel_call(Channel, #'basic.cancel'{consumer_tag = Tag}),
     Module:terminate(Channel, SubsState),
     fox_priv_utils:close_channel(Channel),

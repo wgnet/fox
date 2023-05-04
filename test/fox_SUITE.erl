@@ -293,7 +293,7 @@ subscribe_state_test(_Config) ->
     SubsState = sys:get_state(SubsPid),
     ct:log("SubsState: ~p", [SubsState]),
     ?assertMatch(#subscription{
-        queue = Q,
+        basic_consume = Q,
         subs_module = sample_subs_callback,
         subs_args = [<<"q">>, <<"rk">>],
         subs_state = {<<"my_exchange">>, <<"q">>, <<"rk">>}

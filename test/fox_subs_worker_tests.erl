@@ -16,7 +16,7 @@ setup() ->
 
 start_stop_test() ->
     S = #subscription{
-        queue = <<"q1">>,
+        basic_consume = #'basic.consume'{queue = <<"q1">>},
         subs_module = sample_subs_callback,
         subs_args = [<<"q1">>, <<"k1">>]
     },
@@ -34,7 +34,7 @@ connection_established_test() ->
     {ok, Conn} = amqp_connection:start(Params),
 
     S = #subscription{
-        queue = <<"q1">>,
+        basic_consume = #'basic.consume'{queue = <<"q1">>},
         subs_module = sample_subs_callback,
         subs_args = [<<"q1">>, <<"k1">>]
     },

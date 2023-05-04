@@ -13,7 +13,7 @@
 -spec init(pid(), list()) -> {ok, state()}.
 init(Channel, Args) ->
     put('$module', ?MODULE),
-    error_logger:info_msg("sample_subs_callback:init pid:~0p channel:~0p args:~0p", [self(), Channel, Args]),
+    logger:notice("sample_subs_callback:init pid:~p channel:~p args:~0p", [self(), Channel, Args]),
 
     Exchange = <<"my_exchange">>,
     [Q, RK] = Args,
@@ -29,35 +29,35 @@ init(Channel, Args) ->
 
 -spec handle(term(), pid(), state()) -> {ok, state()}.
 handle(#'basic.consume_ok'{} = Data, Channel, State) ->
-    error_logger:info_msg(
-        "sample_subs_callback:handle basic.consume_ok pid:~0p, channel:~0p, Data:~0p",
+    logger:notice(
+        "sample_subs_callback:handle basic.consume_ok pid:~p, channel:~p, Data:~0p",
         [self(), Channel, Data]),
     {ok, State};
 
 handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, Channel, State) ->
-    error_logger:info_msg(
-        "sample_subs_callback:handle basic.deliver pid:~0p, channel:~0p, Payload:~0p",
+    logger:notice(
+        "sample_subs_callback:handle basic.deliver pid:~p, channel:~p, Payload:~0p",
         [self(), Channel, Payload]),
     amqp_channel:cast(Channel, #'basic.ack'{delivery_tag = Tag}),
     {ok, State};
 
 handle(#'basic.cancel'{} = Data, Channel, State) ->
-    error_logger:info_msg(
-        "sample_subs_callback:handle basic.cancel pid:~0p, channel:~0p, Data:~0p",
+    logger:notice(
+        "sample_subs_callback:handle basic.cancel pid:~p, channel:~p, Data:~0p",
         [self(), Channel, Data]),
     {ok, State};
 
 handle(Data, Channel, State) ->
-    error_logger:error_msg(
-        "sample_subs_callback:handle pid:~0p, channel:~0p, unknown data:~0p",
+    logger:error(
+        "sample_subs_callback:handle pid:~p, channel:~p, unknown data:~0p",
         [self(), Channel, Data]),
     {ok, State}.
 
 
 -spec terminate(pid(), state()) -> ok.
 terminate(Channel, State) ->
-    error_logger:info_msg(
-        "sample_subs_callback:terminate pid:~0p, channel:~0p state:~0p",
+    logger:notice(
+        "sample_subs_callback:terminate pid:~p, channel:~p state:~0p",
         [self(), Channel, State]),
     {Exchange, Q, RK} = State,
     fox:unbind_queue(Channel, Q, Exchange, RK),

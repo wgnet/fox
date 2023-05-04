@@ -20,7 +20,7 @@ close_connection(Pid) ->
         amqp_connection:close(Pid), ok
     catch
         exit:{noproc, _} -> ok; % connection may already be closed
-        E:R -> error_logger:error_msg("can't close connection ~0p:~0p", [E, R])
+        E:R -> logger:error("can't close connection ~p:~w", [E, R])
     end.
 
 
@@ -30,16 +30,16 @@ close_channel(Pid) ->
         amqp_channel:close(Pid), ok
     catch
         exit:{noproc, _} -> ok; % channel may already be closed
-        E:R:StackTrace -> error_logger:error_msg("can't close channel ~0p:~0p ~0p", [E, R, StackTrace])
+        E:R:StackTrace -> logger:error("can't close channel ~p:~w ~w", [E, R, StackTrace])
     end.
 
 
 -spec error_or_info(atom(), iolist(), list()) -> ok.
 error_or_info(normal, ErrMsg, Params) ->
-    error_logger:info_msg(ErrMsg, Params);
+    logger:info(ErrMsg, Params);
 
 error_or_info(_, ErrMsg, Params) ->
-    error_logger:error_msg(ErrMsg, Params).
+    logger:error(ErrMsg, Params).
 
 
 -spec exp_backoff(integer(), integer(), integer()) -> integer().

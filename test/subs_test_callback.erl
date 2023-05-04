@@ -43,7 +43,7 @@ handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}},
     {ok, State};
 
 handle(Data, _ChannelPid, State) ->
-    error_logger:error_msg("subscribe_test:handle, unknown data:~p", [Data]),
+    logger:error("subscribe_test:handle, unknown data:~p", [Data]),
     {ok, State}.
 
 

@@ -48,7 +48,7 @@ create_connection_pool(PoolName, Params) ->
 create_connection_pool(PoolName0, Params, PoolSize) ->
     ConnectionParams = fox_utils:map_to_params_network(Params),
     true = fox_utils:validate_params_network_types(ConnectionParams),
-    error_logger:info_msg("fox create pool ~0p ~0p",
+    logger:notice("fox create pool ~s ~s",
         [PoolName0, fox_utils:params_network_to_str(ConnectionParams)]),
     PoolName = fox_utils:name_to_atom(PoolName0),
     {ok, _} = fox_sup:start_pool(PoolName, ConnectionParams, PoolSize),
@@ -60,7 +60,7 @@ close_connection_pool(PoolName0) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
     case fox_sup:pool_exists(PoolName) of
         true ->
-            error_logger:info_msg("fox stop pool ~0p", [PoolName0]),
+            logger:notice("fox stop pool ~s", [PoolName0]),
             fox_conn_pool:stop(PoolName),
             fox_pub_pool:stop(PoolName),
             fox_sup:stop_pool(PoolName);
@@ -82,14 +82,21 @@ subscribe(PoolName, Queue, SubsModule) ->
 
 -spec subscribe(pool_name(), subscribe_queue(), module(), list()) ->
     {ok, SubscriptionReference :: reference()}.
-subscribe(PoolName0, Queue, SubsModule, SubsArgs) ->
+subscribe(PoolName0, BasicConsumeOrQueueName, SubsModule, SubsArgs) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
 
+    BasicConsume = 
+        case BasicConsumeOrQueueName of
+            #'basic.consume'{} = Consume -> Consume;
+            Name when is_binary(Name) -> #'basic.consume'{queue = Name}
+        end,
+
     Sub = #subscription{
-        queue = Queue,
-        subs_module = SubsModule,
-        subs_args = SubsArgs
-    },
+             basic_consume = BasicConsume,
+             subs_module = SubsModule,
+             subs_args = SubsArgs
+            },
+
     {ok, SPid} = fox_subs_sup:start_subscriber(PoolName, Sub),
     CPid = fox_conn_pool:get_conn_worker(PoolName),
     fox_conn_worker:register_subscriber(CPid, SPid),
@@ -323,6 +330,15 @@ qos(PoolOrChannel, Params) ->
 
 -spec test_run() -> ok.
 test_run() ->
+    Formater = #{legacy_header => false, single_line => true},
+    Config = #{
+               level => info,
+               formatter => {logger_formatter, Formater},
+               filters => [{hide_progress_info, {fun logger_filters:progress/2, stop}}]
+              },
+    logger:set_handler_config(default, Config),
+    logger:set_primary_config(level, info),
+
     application:ensure_all_started(fox),
 
     Params = #{host => "localhost",
@@ -333,20 +349,19 @@ test_run() ->
 
     ok = validate_params_network(Params),
 
-    create_connection_pool("other_pool", Params, 2),
-    {ok, _Ref2} = subscribe("other_pool", <<"q_op_1">>, sample_subs_callback, [<<"q_op_1">>, <<"k_op_1">>]),
-    {ok, _Ref3} = subscribe("other_pool", <<"q_op_2">>, sample_subs_callback, [<<"q_op_2">>, <<"k_op_2">>]),
+    create_connection_pool("my_pool", Params, 3),
 
-    timer:sleep(500),
+    {ok, _Ref1} = subscribe("my_pool", <<"queue_1">>, sample_subs_callback, [<<"queue_1">>, <<"key_1">>]),
 
-    ok = publish("other_pool", <<"my_exchange">>, <<"k_op_1">>, <<"Hello 4">>, #{synchronous => true}),
+    Q = #'basic.consume'{queue = <<"queue_2">>},
+    {ok, Ref2} = subscribe("my_pool", Q, sample_subs_callback, [<<"queue_2">>, <<"key_2">>]),
 
-    %% timer:sleep(2000),
-    %% unsubscribe("other_pool", Ref2),
+    timer:sleep(200),
 
-    %% timer:sleep(2000),
-    %% unsubscribe("other_pool", Ref3),
+    ok = publish("my_pool", <<"my_exchange">>, <<"key_1">>, <<"Hello 1">>, #{synchronous => true}),
+    ok = publish("my_pool", <<"my_exchange">>, <<"key_2">>, <<"Hello 2">>),
 
-    %% close_connection_pool("other_pool"),
+    timer:sleep(2000),
 
+    unsubscribe("my_pool", Ref2),
     ok.
