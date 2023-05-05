@@ -354,14 +354,11 @@ test_run() ->
     {ok, _Ref1} = subscribe("my_pool", <<"queue_1">>, sample_subs_callback, [<<"queue_1">>, <<"key_1">>]),
 
     Q = #'basic.consume'{queue = <<"queue_2">>},
-    {ok, Ref2} = subscribe("my_pool", Q, sample_subs_callback, [<<"queue_2">>, <<"key_2">>]),
-
-    timer:sleep(200),
+    {ok, _Ref2} = subscribe("my_pool", Q, sample_subs_callback, [<<"queue_2">>, <<"key_2">>]),
 
     ok = publish("my_pool", <<"my_exchange">>, <<"key_1">>, <<"Hello 1">>, #{synchronous => true}),
     ok = publish("my_pool", <<"my_exchange">>, <<"key_2">>, <<"Hello 2">>),
 
-    timer:sleep(2000),
-
-    unsubscribe("my_pool", Ref2),
+    %% timer:sleep(2000),
+    %% unsubscribe("my_pool", Ref2),
     ok.

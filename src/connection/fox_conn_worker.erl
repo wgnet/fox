@@ -47,7 +47,11 @@ stop(Pid) ->
 init({RegName, ConnParams}) ->
     put('$module', ?MODULE),
     self() ! connect,
-    {ok, #conn_worker_state{connection_params = ConnParams, registered_name = RegName}}.
+    {ok, #conn_worker_state{
+            connection_ready = false,
+            connection_params = ConnParams, 
+            registered_name = RegName
+           }}.
 
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
@@ -66,11 +70,15 @@ handle_call(Any, _From, State) ->
 
 
 -spec handle_cast(gs_request(), gs_state()) -> gs_cast_reply().
-handle_cast({register_subscriber, Pid}, #conn_worker_state{connection = Conn, subscribers = Subs} = State) ->
-    case Conn of
-        undefined -> do_nothing;
-        _ -> fox_subs_worker:connection_established(Pid, Conn)
-    end,
+handle_cast({register_subscriber, Pid}, 
+            #conn_worker_state{connection_ready = false, subscribers = Subs} = State
+           ) ->
+    {noreply, State#conn_worker_state{subscribers = [Pid | Subs]}};
+
+handle_cast({register_subscriber, Pid}, 
+            #conn_worker_state{connection_ready = true, connection = Conn, subscribers = Subs} = State
+           ) ->
+    fox_subs_worker:connection_established(Pid, Conn),
     {noreply, State#conn_worker_state{subscribers = [Pid | Subs]}};
 
 handle_cast({remove_subscriber, Pid}, #conn_worker_state{subscribers = Subs} = State) ->
@@ -87,7 +95,6 @@ handle_info(connect,
     #conn_worker_state{
         connection = undefined, connection_ref = undefined,
         connection_params = Params, reconnect_attempt = Attempt,
-        subscribers = Subscribers,
         registered_name = RegName
     } = State) ->
     SParams = fox_utils:params_network_to_str(Params),
@@ -95,19 +102,37 @@ handle_info(connect,
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
             logger:notice("~s connected to ~s", [RegName, SParams]),
-            [fox_subs_worker:connection_established(Pid, Conn) || Pid <- Subscribers],
-            {noreply, State#conn_worker_state{
+            %% Need a small pause here 
+            %% because RabbitMQ is not ready to accept subscriptions 
+            %% immediatelly after restart.
+            {ok, SubscribeTimeout} = application:get_env(fox, subscribe_timeout),
+            erlang:send_after(SubscribeTimeout, self(), notify_subscribers),
+            State2 = State#conn_worker_state{
                 connection = Conn,
                 connection_ref = Ref,
-                reconnect_attempt = 0}};
+                connection_ready = false,
+                reconnect_attempt = 0
+            },
+            {noreply, State2};
         {error, Reason} ->
             logger:error("~s could not connect to ~s ~w", [RegName, SParams, Reason]),
             fox_priv_utils:reconnect(Attempt),
-            {noreply, State#conn_worker_state{
+            State2 = State#conn_worker_state{
                 connection = undefined,
                 connection_ref = undefined,
-                reconnect_attempt = Attempt + 1}}
+                connection_ready = true,
+                reconnect_attempt = Attempt + 1
+            },
+            {noreply, State2}
     end;
+
+handle_info(notify_subscribers,
+    #conn_worker_state{
+        connection = Conn,
+        subscribers = Subscribers
+    } = State) ->
+    [fox_subs_worker:connection_established(Pid, Conn) || Pid <- Subscribers],
+    {noreply, State#conn_worker_state{connection_ready = true}};
 
 handle_info({'DOWN', Ref, process, Conn, Reason},
             #conn_worker_state{
@@ -118,7 +143,10 @@ handle_info({'DOWN', Ref, process, Conn, Reason},
             } = State) ->
     fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~0p", [RegName, Reason]),
     fox_priv_utils:reconnect(Attempt),
-    {noreply, State#conn_worker_state{connection = undefined, connection_ref = undefined}};
+    {noreply, State#conn_worker_state{
+                connection_ready = false, 
+                connection = undefined, 
+                connection_ref = undefined}};
 
 
 handle_info(Request, State) ->

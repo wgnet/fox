@@ -8,6 +8,7 @@
     connection :: pid() | undefined,
     connection_ref :: reference() | undefined,
     connection_params :: #amqp_params_network{},
+    connection_ready = false :: boolean(),
     reconnect_attempt = 0 :: non_neg_integer(),
     subscribers = [] :: [pid()],
     registered_name :: atom()
