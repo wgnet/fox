@@ -136,7 +136,7 @@ handle_info({'DOWN', Ref, process, Conn, Reason},
             fox_priv_utils:close_channel(Channel)
         end,
         queue:to_list(Channels)),
-    fox_priv_utils:error_or_info(Reason, "~0p, connection is DOWN: ~0p", [RegName, Reason]),
+    fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~w", [RegName, Reason]),
     fox_priv_utils:reconnect(Attempt),
     {noreply, State#state{connection = undefined, connection_ref = undefined, channels = undefined}};
 

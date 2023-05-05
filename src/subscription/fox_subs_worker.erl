@@ -112,7 +112,7 @@ handle_info({'DOWN', Ref, process, Channel, Reason},
                 channel = Channel,
                 channel_ref = Ref
             } = State) ->
-    fox_priv_utils:error_or_info(Reason, "~s, channel is DOWN: ~0p", [worker_name(State), Reason]),
+    fox_priv_utils:error_or_info(Reason, "~s, channel is DOWN: ~w", [worker_name(State), Reason]),
 
     ConnectionAlive = is_process_alive(Conn),
     if

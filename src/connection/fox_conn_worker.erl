@@ -141,7 +141,7 @@ handle_info({'DOWN', Ref, process, Conn, Reason},
                 reconnect_attempt = Attempt,
                 registered_name = RegName
             } = State) ->
-    fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~0p", [RegName, Reason]),
+    fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~w", [RegName, Reason]),
     fox_priv_utils:reconnect(Attempt),
     {noreply, State#conn_worker_state{
                 connection_ready = false, 
