@@ -15,7 +15,11 @@ setup() ->
 
 
 start_stop_test() ->
+    Params = setup(),
+    fox:create_connection_pool(fox_subs_worker_start_stop_test, Params, 3),
+
     S = #subscription{
+        pool_name = fox_subs_worker_start_stop_test,
         basic_consume = #'basic.consume'{queue = <<"q1">>},
         subs_module = sample_subs_callback,
         subs_args = [<<"q1">>, <<"k1">>]
@@ -31,9 +35,11 @@ start_stop_test() ->
 
 connection_established_test() ->
     Params = setup(),
+    fox:create_connection_pool(fox_subs_worker_connection_established_test, Params, 3),
     {ok, Conn} = amqp_connection:start(Params),
 
     S = #subscription{
+        pool_name = fox_subs_worker_connection_established_test,
         basic_consume = #'basic.consume'{queue = <<"q1">>},
         subs_module = sample_subs_callback,
         subs_args = [<<"q1">>, <<"k1">>]

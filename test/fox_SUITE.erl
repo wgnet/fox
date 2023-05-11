@@ -288,7 +288,7 @@ subscribe_state_test(_Config) ->
     ConnState = sys:get_state(ConnPid),
     ct:log("ConnState: ~p", [ConnState]),
     #conn_worker_state{subscribers = Subscribers} = ConnState,
-    ?assertEqual([SubsPid], Subscribers),
+    ?assertMatch([{SubsPid, _}], Subscribers),
 
     SubsState = sys:get_state(SubsPid),
     ct:log("SubsState: ~p", [SubsState]),
