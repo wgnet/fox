@@ -45,3 +45,26 @@ reconnect_test() ->
     ?assertEqual(undefined, erlang:process_info(Pid, status)),
 
     ok.
+
+register_subscriber_test() ->
+    Params = setup(),
+    {ok, Pid} = fox_conn_worker:start_link(some_pool, 1, Params),
+    SPid = self(),
+
+    fox_conn_worker:register_subscriber(Pid, SPid),    
+    timer:sleep(100),
+
+    #conn_worker_state{subscribers = Subs} = sys:get_state(Pid),
+    ?assertMatch([{SPid, _}], Subs),
+
+    ?assertMatch({SPid, _}, lists:keyfind(SPid, 1, Subs)), % TEMP
+    
+    fox_conn_worker:remove_subscriber(Pid, SPid),
+    timer:sleep(100),
+
+    #conn_worker_state{subscribers = Subs2} = sys:get_state(Pid),
+    ?assertEqual([], Subs2),
+
+    ok.
+    
+    

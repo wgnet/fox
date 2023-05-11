@@ -79,8 +79,8 @@ handle_cast({register_subscriber, Pid},
 handle_cast({remove_subscriber, Pid}, #conn_worker_state{subscribers = Subs} = State) ->
     Subs2 = case lists:keyfind(Pid, 1, Subs) of
                 {Pid, Ref} -> 
-                    lists:delete(Pid, Subs),
-                    erlang:demonitor(Ref, [flush]);
+                    erlang:demonitor(Ref, [flush]),
+                    lists:delete({Pid, Ref}, Subs);
                 false -> Subs
             end,
     {noreply, State#conn_worker_state{subscribers = Subs2}};
