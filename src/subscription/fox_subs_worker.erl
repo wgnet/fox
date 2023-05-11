@@ -36,9 +36,10 @@ stop(Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(#subscription{} = State) ->
+init(#subscription{conn_worker = CPid} = State) ->
     logger:info("~s init", [worker_name(State)]),
     put('$module', ?MODULE),
+    fox_conn_worker:register_subscriber(CPid, self()),
     {ok, State}.
 
 
@@ -152,7 +153,7 @@ handle(Msg,
 
 worker_name(#subscription{basic_consume = BasicConsume}) ->
     #'basic.consume'{queue = Name} = BasicConsume,
-    <<"fox_subs_worker ", Name/binary>>.
+    <<"fox_subs_worker/", Name/binary>>.
 
 unsubscribe(#subscription{channel = undefined} = State) ->
     State;

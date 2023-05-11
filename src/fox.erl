@@ -84,6 +84,7 @@ subscribe(PoolName, Queue, SubsModule) ->
     {ok, SubscriptionReference :: reference()}.
 subscribe(PoolName0, BasicConsumeOrQueueName, SubsModule, SubsArgs) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
+    CPid = fox_conn_pool:get_conn_worker(PoolName),
 
     BasicConsume = 
         case BasicConsumeOrQueueName of
@@ -92,14 +93,13 @@ subscribe(PoolName0, BasicConsumeOrQueueName, SubsModule, SubsArgs) ->
         end,
 
     Sub = #subscription{
+             conn_worker = CPid,
              basic_consume = BasicConsume,
              subs_module = SubsModule,
              subs_args = SubsArgs
             },
 
     {ok, SPid} = fox_subs_sup:start_subscriber(PoolName, Sub),
-    CPid = fox_conn_pool:get_conn_worker(PoolName),
-    fox_conn_worker:register_subscriber(CPid, SPid),
 
     SubsMeta = #subs_meta{
         ref = make_ref(),

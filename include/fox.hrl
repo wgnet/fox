@@ -15,6 +15,7 @@
 
 -record(subscription, {
     connection :: pid() | undefined,
+    conn_worker :: pid(),
     basic_consume :: #'basic.consume'{},
     subs_module :: module(),
     subs_args :: list(),
