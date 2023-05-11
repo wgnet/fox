@@ -11,7 +11,6 @@
          {connection_timeout, 10000},
          {max_reconnect_timeout, 5000},
          {min_reconnect_timeout, 100},
-         {subscribe_timeout, 300},
          {num_publish_channels, 20}
         ]},
   {licenses, ["MIT"]}

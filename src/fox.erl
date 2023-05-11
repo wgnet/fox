@@ -360,5 +360,5 @@ test_run() ->
     ok = publish("my_pool", <<"my_exchange">>, <<"key_2">>, <<"Hello 2">>),
 
     %% timer:sleep(2000),
-    %% unsubscribe("my_pool", Ref2),
+    %% unsubscribe("my_pool", _Ref2),
     ok.

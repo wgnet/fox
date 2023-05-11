@@ -13,7 +13,7 @@
     connection_params :: #amqp_params_network{},
     reconnect_attempt = 0 :: non_neg_integer(),
     num_channels :: integer(),
-    channels :: queue:queue(),
+    channels :: queue:queue() | undefined,
     registered_name :: atom()
 }).
 

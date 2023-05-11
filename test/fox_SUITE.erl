@@ -290,7 +290,6 @@ subscribe_state_test(_Config) ->
     #conn_worker_state{subscribers = Subscribers} = ConnState,
     ?assertEqual([SubsPid], Subscribers),
 
-    timer:sleep(?DELAY),
     SubsState = sys:get_state(SubsPid),
     ct:log("SubsState: ~p", [SubsState]),
     ?assertMatch(#subscription{
