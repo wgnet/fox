@@ -136,6 +136,7 @@ handle_info(Request, State) ->
 
 -spec terminate(terminate_reason(), gs_state()) -> ok.
 terminate(Reason, State) ->
+    unsubscribe(State),
     fox_priv_utils:error_or_info(Reason, "~s terminated with reason ~w", [worker_name(State), Reason]),
     ok.
 

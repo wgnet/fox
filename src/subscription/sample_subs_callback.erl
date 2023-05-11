@@ -34,6 +34,10 @@ handle(#'basic.consume_ok'{} = Data, Channel, State) ->
         [self(), Channel, Data]),
     {ok, State};
 
+handle({#'basic.deliver'{}, #amqp_msg{payload = <<"boom">>}}, _Channel, State) ->
+    erlang:error(boom),
+    {ok, State};
+
 handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}}, Channel, State) ->
     logger:notice(
         "sample_subs_callback:handle basic.deliver pid:~p, channel:~p, Payload:~0p",

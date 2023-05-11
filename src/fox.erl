@@ -343,6 +343,8 @@ test_run() ->
     ok = validate_params_network(Params),
 
     create_connection_pool("my_pool", Params, 3),
+    {ok, Channel} = get_channel("my_pool"),
+    declare_exchange(Channel, <<"my_exchange">>),
 
     {ok, _Ref1} = subscribe("my_pool", <<"queue_1">>, sample_subs_callback, [<<"queue_1">>, <<"key_1">>]),
 
