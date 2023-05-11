@@ -72,11 +72,17 @@ handle_call(Any, _From, State) ->
 handle_cast({register_subscriber, Pid}, 
             #conn_worker_state{connection = Conn, subscribers = Subs} = State
            ) ->
+    Ref = erlang:monitor(process, Pid),
     fox_subs_worker:connection_established(Pid, Conn),
-    {noreply, State#conn_worker_state{subscribers = [Pid | Subs]}};
+    {noreply, State#conn_worker_state{subscribers = [{Pid, Ref} | Subs]}};
 
 handle_cast({remove_subscriber, Pid}, #conn_worker_state{subscribers = Subs} = State) ->
-    Subs2 = lists:delete(Pid, Subs),
+    Subs2 = case lists:keyfind(Pid, 1, Subs) of
+                {Pid, Ref} -> 
+                    lists:delete(Pid, Subs),
+                    erlang:demonitor(Ref, [flush]);
+                false -> Subs
+            end,
     {noreply, State#conn_worker_state{subscribers = Subs2}};
 
 handle_cast(Any, State) ->
@@ -96,7 +102,7 @@ handle_info(connect,
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
             logger:notice("~s connected to ~s", [RegName, SParams]),
-            [fox_subs_worker:connection_established(Pid, Conn) || Pid <- Subscribers],
+            [fox_subs_worker:connection_established(Pid, Conn) || {Pid, _} <- Subscribers],
 
             State2 = State#conn_worker_state{
                 connection = Conn,
@@ -128,6 +134,12 @@ handle_info({'DOWN', Ref, process, Conn, Reason},
     {noreply, State#conn_worker_state{
                 connection = undefined, 
                 connection_ref = undefined}};
+
+handle_info({'DOWN', Ref, process, Pid, Reason},
+            #conn_worker_state{subscribers = Subs, registered_name = RegName} = State) ->
+    fox_priv_utils:error_or_info(Reason, "~s, subscriber is DOWN: ~w", [RegName, Reason]),
+    Subs2 = lists:delete({Pid, Ref}, Subs),
+    {noreply, State#conn_worker_state{subscribers = Subs2}};
 
 
 handle_info(Request, State) ->

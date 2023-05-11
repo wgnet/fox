@@ -9,7 +9,7 @@
     connection_ref :: reference() | undefined,
     connection_params :: #amqp_params_network{},
     reconnect_attempt = 0 :: non_neg_integer(),
-    subscribers = [] :: [pid()],
+    subscribers = [] :: [{pid(), reference()}],
     registered_name :: atom()
 }).
 
