@@ -36,10 +36,17 @@ stop(Pid) ->
 %%% gen_server API
 
 -spec init(gs_args()) -> gs_init_reply().
-init(#subscription{conn_worker = CPid} = State) ->
+init(#subscription{ref = SubsRef, pool_name = PoolName, conn_worker = CPid} = State) ->
     logger:info("~s init", [worker_name(State)]),
     put('$module', ?MODULE),
     fox_conn_worker:register_subscriber(CPid, self()),
+
+    SubsMeta = #subs_meta{
+        ref = SubsRef,
+        conn_worker = CPid,
+        subs_worker = self()
+    },
+    fox_conn_pool:save_subs_meta(PoolName, SubsMeta),
     {ok, State}.
 
 
@@ -151,9 +158,10 @@ handle(Msg,
 
 %%% inner functions
 
-worker_name(#subscription{basic_consume = BasicConsume}) ->
+worker_name(#subscription{pool_name = PoolName, basic_consume = BasicConsume}) ->
     #'basic.consume'{queue = Name} = BasicConsume,
-    <<"fox_subs_worker/", Name/binary>>.
+    PoolNameBin = list_to_binary(atom_to_list(PoolName)),
+    <<"fox_subs_worker/", PoolNameBin/binary, "/", Name/binary>>.
 
 unsubscribe(#subscription{channel = undefined} = State) ->
     State;

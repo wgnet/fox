@@ -85,29 +85,22 @@ subscribe(PoolName, Queue, SubsModule) ->
 subscribe(PoolName0, BasicConsumeOrQueueName, SubsModule, SubsArgs) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
     CPid = fox_conn_pool:get_conn_worker(PoolName),
-
     BasicConsume = 
         case BasicConsumeOrQueueName of
             #'basic.consume'{} = Consume -> Consume;
             Name when is_binary(Name) -> #'basic.consume'{queue = Name}
         end,
-
-    Sub = #subscription{
-             conn_worker = CPid,
-             basic_consume = BasicConsume,
-             subs_module = SubsModule,
-             subs_args = SubsArgs
+    SubsRef = make_ref(),
+    Subs = #subscription{
+              ref = SubsRef,
+              pool_name = PoolName,
+              conn_worker = CPid,
+              basic_consume = BasicConsume,
+              subs_module = SubsModule,
+              subs_args = SubsArgs
             },
-
-    {ok, SPid} = fox_subs_sup:start_subscriber(PoolName, Sub),
-
-    SubsMeta = #subs_meta{
-        ref = make_ref(),
-        conn_worker = CPid,
-        subs_worker = SPid
-    },
-    fox_conn_pool:save_subs_meta(PoolName, SubsMeta),
-    {ok, SubsMeta#subs_meta.ref}.
+    {ok, _} = fox_subs_sup:start_subscriber(PoolName, Subs),
+    {ok, SubsRef}.
 
 
 -spec unsubscribe(pool_name(), SubscriptionReference :: reference()) ->

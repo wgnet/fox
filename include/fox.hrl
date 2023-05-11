@@ -14,6 +14,8 @@
 }).
 
 -record(subscription, {
+    ref :: reference(),
+    pool_name :: atom(),
     connection :: pid() | undefined,
     conn_worker :: pid(),
     basic_consume :: #'basic.consume'{},
