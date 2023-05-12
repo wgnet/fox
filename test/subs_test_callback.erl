@@ -35,6 +35,11 @@ handle(#'basic.consume_ok'{}, _Channel, State) ->
 handle(#'basic.cancel'{}, _Channel, State) ->
     {ok, State};
 
+handle({#'basic.deliver'{}, #amqp_msg{payload = <<"boom">>}}, _Channel, State) ->
+    ct:log("subscribe_test: going to crash"),
+    erlang:error(boom),
+    {ok, State};
+
 handle({#'basic.deliver'{delivery_tag = Tag}, #amqp_msg{payload = Payload}},
     Channel, #state{table = Table, queue = Queue} = State) ->
     ct:log("subscribe_test:handle basic.deliver, Payload:~p", [Payload]),

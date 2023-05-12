@@ -111,7 +111,7 @@ handle_info(#'basic.cancel'{} = Msg, State) ->
     {noreply, handle(Msg, State)};
 
 handle_info({'DOWN', _Ref, process, _Channel, normal}, State) ->
-    logger:error("~s channel closed", [State]),
+    logger:error("~s channel closed", [worker_name(State)]),
     {noreply, State#subscription{channel = undefined, channel_ref = undefined}};
 
 handle_info({'DOWN', Ref, process, Channel, Reason},

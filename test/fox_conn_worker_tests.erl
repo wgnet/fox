@@ -57,7 +57,11 @@ register_subscriber_test() ->
     #conn_worker_state{subscribers = Subs} = sys:get_state(Pid),
     ?assertMatch([{SPid, _}], Subs),
 
-    ?assertMatch({SPid, _}, lists:keyfind(SPid, 1, Subs)), % TEMP
+    receive
+        {'$gen_cast', {connection_established, _}} -> ok
+    after 500 ->
+        throw(dont_get_connection_established)
+    end,
     
     fox_conn_worker:remove_subscriber(Pid, SPid),
     timer:sleep(100),

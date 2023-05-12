@@ -21,7 +21,8 @@ all() ->
         sync_publish_test,
         subscribe_test,
         subscribe_2_queues_test,
-        subscribe_state_test
+        subscribe_state_test,
+        subs_worker_crash_test
     ].
 
 
@@ -133,18 +134,19 @@ sync_publish_test(_Config) ->
 
 -spec subscribe_test(list()) -> ok.
 subscribe_test(_Config) ->
+    PoolName = subscribe_test,
     T = ets:new(subscribe_test_ets, [public, named_table]),
     E = <<"my_exchange">>,
-    Q = <<"my_queue">>,
-    RK = <<"my_key">>,
+    Q = <<"subscribe_test_queue">>,
+    RK = <<"subscribe_test_key">>,
     Args = {T, E, Q, RK},
-    {ok, Ref} = fox:subscribe(subscribe_test, Q, subs_test_callback, Args),
+    {ok, Ref} = fox:subscribe(PoolName, Q, subs_test_callback, Args),
 
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([{1, Q, init, Args}], get_subs_log(T)),
 
-    fox:publish(subscribe_test, E, RK, <<"Hi there!">>),
+    fox:publish(PoolName, E, RK, <<"Hi there!">>),
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
@@ -152,7 +154,7 @@ subscribe_test(_Config) ->
         {2, Q, handle_basic_deliver, <<"Hi there!">>}
     ], get_subs_log(T)),
 
-    fox:publish(subscribe_test, E, RK, <<"Hello!">>),
+    fox:publish(PoolName, E, RK, <<"Hello!">>),
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
@@ -161,7 +163,7 @@ subscribe_test(_Config) ->
         {3, Q, handle_basic_deliver, <<"Hello!">>}
     ], get_subs_log(T)),
 
-    fox:unsubscribe(subscribe_test, Ref),
+    fox:unsubscribe(PoolName, Ref),
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
@@ -177,13 +179,13 @@ subscribe_test(_Config) ->
 
 -spec subscribe_2_queues_test(list()) -> ok.
 subscribe_2_queues_test(_Config) ->
-    Pool = subscribe_2_queues_test,
+    PoolName = subscribe_2_queues_test,
     T = ets:new(subscribe_2_queues_test_ets, [public, named_table]),
     E = <<"my_exchange">>,
-    Q1 = <<"q1">>,
-    K1 = <<"k1">>,
+    Q1 = <<"subscribe_2_queues_test_queue_1">>,
+    K1 = <<"subscribe_2_queues_test_key_1">>,
     Args1 = {T, E, Q1, K1},
-    {ok, Ref1} = fox:subscribe(Pool, Q1, subs_test_callback, Args1),
+    {ok, Ref1} = fox:subscribe(PoolName, Q1, subs_test_callback, Args1),
 
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
@@ -191,10 +193,10 @@ subscribe_2_queues_test(_Config) ->
         {1, Q1, init, Args1}
     ], get_subs_log(T)),
 
-    Q2 = <<"q2">>,
-    K2 = <<"k2">>,
+    Q2 = <<"subscribe_2_queues_test_queue_2">>,
+    K2 = <<"subscribe_2_queues_test_key_2">>,
     Args2 = {T, E, Q2, K2},
-    {ok, Ref2} = fox:subscribe(Pool, Q2, subs_test_callback, Args2),
+    {ok, Ref2} = fox:subscribe(PoolName, Q2, subs_test_callback, Args2),
 
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
@@ -203,7 +205,7 @@ subscribe_2_queues_test(_Config) ->
         {2, Q2, init, Args2}
     ], get_subs_log(T)),
 
-    fox:publish(Pool, E, K1, <<"Msg1 to K1">>),
+    fox:publish(PoolName, E, K1, <<"Msg1 to K1">>),
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
@@ -212,7 +214,7 @@ subscribe_2_queues_test(_Config) ->
         {3, Q1, handle_basic_deliver, <<"Msg1 to K1">>}
     ], get_subs_log(T)),
 
-    fox:publish(Pool, E, K2, <<"Msg2 to K2">>),
+    fox:publish(PoolName, E, K2, <<"Msg2 to K2">>),
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
@@ -222,7 +224,7 @@ subscribe_2_queues_test(_Config) ->
         {4, Q2, handle_basic_deliver, <<"Msg2 to K2">>}
     ], get_subs_log(T)),
 
-    fox:publish(Pool, E, K2, <<"Msg3 to K2">>),
+    fox:publish(PoolName, E, K2, <<"Msg3 to K2">>),
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
@@ -233,7 +235,7 @@ subscribe_2_queues_test(_Config) ->
         {5, Q2, handle_basic_deliver, <<"Msg3 to K2">>}
     ], get_subs_log(T)),
 
-    fox:publish(Pool, E, K1, <<"Msg4 to K1">>),
+    fox:publish(PoolName, E, K1, <<"Msg4 to K1">>),
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
@@ -246,7 +248,7 @@ subscribe_2_queues_test(_Config) ->
     ], get_subs_log(T)),
 
 
-    fox:unsubscribe(Pool, Ref1),
+    fox:unsubscribe(PoolName, Ref1),
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
@@ -259,7 +261,7 @@ subscribe_2_queues_test(_Config) ->
         {7, Q1, terminate}
     ], get_subs_log(T)),
 
-    fox:unsubscribe(Pool, Ref2),
+    fox:unsubscribe(PoolName, Ref2),
     timer:sleep(?DELAY),
     ct:log("~p", [get_subs_log(T)]),
     ?assertMatch([
@@ -279,11 +281,12 @@ subscribe_2_queues_test(_Config) ->
 
 -spec subscribe_state_test(list()) -> ok.
 subscribe_state_test(_Config) ->
+    PoolName = subscribe_state_test,
     Q = #'basic.consume'{queue = <<"q">>},
-    {ok, Ref} = fox:subscribe(subscribe_state_test, Q, sample_subs_callback, [<<"q">>, <<"rk">>]),
+    {ok, Ref} = fox:subscribe(PoolName, Q, sample_subs_callback, [<<"q">>, <<"rk">>]),
 
     #subs_meta{conn_worker = ConnPid, subs_worker = SubsPid} =
-        fox_conn_pool:get_subs_meta(subscribe_state_test, Ref),
+        fox_conn_pool:get_subs_meta(PoolName, Ref),
 
     ConnState = sys:get_state(ConnPid),
     ct:log("ConnState: ~p", [ConnState]),
@@ -293,6 +296,9 @@ subscribe_state_test(_Config) ->
     SubsState = sys:get_state(SubsPid),
     ct:log("SubsState: ~p", [SubsState]),
     ?assertMatch(#subscription{
+        ref = Ref,
+        pool_name = PoolName,
+        conn_worker = ConnPid,
         basic_consume = Q,
         subs_module = sample_subs_callback,
         subs_args = [<<"q">>, <<"rk">>],
@@ -300,6 +306,54 @@ subscribe_state_test(_Config) ->
     }, SubsState),
 
     fox:unsubscribe(subscribe_state_test, Ref),
+    ok.
+
+subs_worker_crash_test(_Config) ->
+    PoolName = subs_worker_crash_test,
+
+    T = ets:new(PoolName, [public, named_table]),
+    E = <<"my_exchange">>,
+    Q = <<"subs_worker_crash_test_queue">>,
+    RK = <<"subs_worker_crash_test_key">>,
+    Args = {T, E, Q, RK},
+    {ok, _Ref} = fox:subscribe(PoolName, Q, subs_test_callback, Args),
+
+    timer:sleep(?DELAY),
+    ct:log("~p", [get_subs_log(T)]),
+    ?assertMatch([{1, Q, init, Args}], get_subs_log(T)),
+
+    fox:publish(PoolName, E, RK, <<"Event 1">>),
+    timer:sleep(?DELAY),
+    ct:log("~p", [get_subs_log(T)]),
+    ?assertMatch([
+        {1, Q, init, Args},
+        {2, Q, handle_basic_deliver, <<"Event 1">>}
+    ], get_subs_log(T)),
+
+    fox:publish(PoolName, E, RK, <<"Event 2">>),
+    timer:sleep(?DELAY),
+    ct:log("~p", [get_subs_log(T)]),
+    ?assertMatch([
+        {1, Q, init, Args},
+        {2, Q, handle_basic_deliver, <<"Event 1">>},
+        {3, Q, handle_basic_deliver, <<"Event 2">>}
+    ], get_subs_log(T)),
+
+    %% crash subs_worker
+    fox:publish(PoolName, E, RK, <<"boom">>),
+    timer:sleep(?DELAY),
+
+    fox:publish(PoolName, E, RK, <<"Event 3">>),
+    timer:sleep(?DELAY),
+    ct:log("~p", [get_subs_log(T)]),
+    ?assertMatch([
+        {1, Q, init, Args},
+        {2, Q, handle_basic_deliver, <<"Event 1">>},
+        {3, Q, handle_basic_deliver, <<"Event 2">>},
+        {4, Q, terminate},
+        {5, Q, init, Args},
+        {6, Q, handle_basic_deliver, <<"Event 3">>}
+    ], get_subs_log(T)),
     ok.
 
 
