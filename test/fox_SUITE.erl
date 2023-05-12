@@ -22,7 +22,8 @@ all() ->
         subscribe_test,
         subscribe_2_queues_test,
         subscribe_state_test,
-        subs_worker_crash_test
+        subs_worker_crash_test,
+        channel_crash_test
     ].
 
 
@@ -308,6 +309,7 @@ subscribe_state_test(_Config) ->
     fox:unsubscribe(subscribe_state_test, Ref),
     ok.
 
+-spec subs_worker_crash_test(list()) -> ok.
 subs_worker_crash_test(_Config) ->
     PoolName = subs_worker_crash_test,
 
@@ -353,6 +355,57 @@ subs_worker_crash_test(_Config) ->
         {4, Q, terminate},
         {5, Q, init, Args},
         {6, Q, handle_basic_deliver, <<"Event 3">>}
+    ], get_subs_log(T)),
+    ok.
+
+
+-spec channel_crash_test(list()) -> ok.
+channel_crash_test(_Config) ->
+    PoolName = channel_crash_test,
+
+    T = ets:new(PoolName, [public, named_table]),
+    E = <<"my_exchange">>,
+    Q = <<"channel_crash_test_queue">>,
+    RK = <<"channel_crash_test_key">>,
+    Args = {T, E, Q, RK},
+    {ok, Ref} = fox:subscribe(PoolName, Q, subs_test_callback, Args),
+
+    timer:sleep(?DELAY),
+    ct:log("~p", [get_subs_log(T)]),
+    ?assertMatch([{1, Q, init, Args}], get_subs_log(T)),
+
+    fox:publish(PoolName, E, RK, <<"Event 1">>),
+    timer:sleep(?DELAY),
+    ct:log("~p", [get_subs_log(T)]),
+    ?assertMatch([
+        {1, Q, init, Args},
+        {2, Q, handle_basic_deliver, <<"Event 1">>}
+    ], get_subs_log(T)),
+
+    fox:publish(PoolName, E, RK, <<"Event 2">>),
+    timer:sleep(?DELAY),
+    ct:log("~p", [get_subs_log(T)]),
+    ?assertMatch([
+        {1, Q, init, Args},
+        {2, Q, handle_basic_deliver, <<"Event 1">>},
+        {3, Q, handle_basic_deliver, <<"Event 2">>}
+    ], get_subs_log(T)),
+
+    %% crash channel
+    #subs_meta{subs_worker = SubsPid} = fox_conn_pool:get_subs_meta(PoolName, Ref),
+    #subscription{channel = Channel} = sys:get_state(SubsPid),
+    exit(Channel, boom),
+    timer:sleep(?DELAY),
+
+    fox:publish(PoolName, E, RK, <<"Event 3">>),
+    timer:sleep(?DELAY),
+    ct:log("~p", [get_subs_log(T)]),
+    ?assertMatch([
+        {1, Q, init, Args},
+        {2, Q, handle_basic_deliver, <<"Event 1">>},
+        {3, Q, handle_basic_deliver, <<"Event 2">>},
+        {4, Q, init, Args},
+        {5, Q, handle_basic_deliver, <<"Event 3">>}
     ], get_subs_log(T)),
     ok.
 
