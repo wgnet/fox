@@ -1,7 +1,7 @@
 -module(fox_subs_worker).
 -behavior(gen_server).
 
--export([start_link/1, connection_established/2, stop/1]).
+-export([start_link/2, connection_established/2, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("otp_types.hrl").
@@ -14,9 +14,9 @@
 
 %%% module API
 
--spec start_link(#subscription{}) -> gs_start_link_reply().
-start_link(State) ->
-    gen_server:start_link(?MODULE, State, []).
+-spec start_link(#subscription{}, [gen_server:start_opt()]) -> gs_start_link_reply().
+start_link(State, StartOptions) ->
+    gen_server:start_link(?MODULE, State, StartOptions).
 
 
 -spec connection_established(pid(), pid()) -> ok.
@@ -74,7 +74,7 @@ handle_cast({connection_established, Conn},
         = State) ->
     State2 = unsubscribe(State),
     case amqp_connection:open_channel(Conn) of
-        {ok, Channel} -> 
+        {ok, Channel} ->
             logger:info("~s subscribe to queue", [worker_name(State)]),
 
             Ref = erlang:monitor(process, Channel),
@@ -85,11 +85,11 @@ handle_cast({connection_established, Conn},
 
             {noreply, State2#subscription{
                         connection = Conn,
-                        channel = Channel, 
-                        channel_ref = Ref, 
-                        subs_state = SubsState, 
+                        channel = Channel,
+                        channel_ref = Ref,
+                        subs_state = SubsState,
                         subs_tag = Tag}};
-        Other -> 
+        Other ->
             logger:info("~s can't subscribe to queue, reason: ~w", [worker_name(State), Other]),
             {noreply, State2}
     end;
