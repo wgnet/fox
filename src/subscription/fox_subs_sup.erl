@@ -1,7 +1,7 @@
 -module(fox_subs_sup).
 -behaviour(supervisor).
 
--export([start_link/1, start_subscriber/2, init/1]).
+-export([start_link/1, start_subscriber/3, init/1]).
 
 -include("otp_types.hrl").
 -include("fox.hrl").
@@ -13,10 +13,10 @@ start_link(PoolName) ->
     supervisor:start_link({local, RegName}, ?MODULE, no_args).
 
 
--spec start_subscriber(atom(), #subscription{}) -> startchild_ret().
-start_subscriber(PoolName, Sub) ->
+-spec start_subscriber(atom(), #subscription{}, [gen_server:start_opt()]) -> startchild_ret().
+start_subscriber(PoolName, Subscription, GenServerStartOptions) ->
     RegName = fox_utils:make_reg_name(?MODULE, PoolName),
-    supervisor:start_child(RegName, [Sub]).
+    supervisor:start_child(RegName, [Subscription, GenServerStartOptions]).
 
 
 -spec(init(gs_args()) -> sup_init_reply()).

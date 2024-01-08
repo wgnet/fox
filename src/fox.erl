@@ -5,7 +5,8 @@
          create_connection_pool/3,
          close_connection_pool/1,
          get_channel/1,
-         subscribe/3, subscribe/4, unsubscribe/2,
+         subscribe/3, subscribe/4, subscribe/5,
+         unsubscribe/2,
          declare_exchange/2, declare_exchange/3,
          delete_exchange/2, delete_exchange/3,
          bind_exchange/4, bind_exchange/5,
@@ -77,15 +78,20 @@ get_channel(PoolName0) ->
 -spec subscribe(pool_name(), subscribe_queue(), module()) ->
     {ok, SubscriptionReference :: reference()} | {error, Reason :: term()}.
 subscribe(PoolName, Queue, SubsModule) ->
-    subscribe(PoolName, Queue, SubsModule, []).
+    subscribe(PoolName, Queue, SubsModule, [], []).
 
 
 -spec subscribe(pool_name(), subscribe_queue(), module(), list()) ->
     {ok, SubscriptionReference :: reference()}.
 subscribe(PoolName0, BasicConsumeOrQueueName, SubsModule, SubsArgs) ->
+    subscribe(PoolName0, BasicConsumeOrQueueName, SubsModule, SubsArgs, []).
+
+-spec subscribe(pool_name(), subscribe_queue(), module(), list(), [gen_server:start_opt()]) ->
+    {ok, SubscriptionReference :: reference()}.
+subscribe(PoolName0, BasicConsumeOrQueueName, SubsModule, SubsArgs, GenServerStartOptions) ->
     PoolName = fox_utils:name_to_atom(PoolName0),
     CPid = fox_conn_pool:get_conn_worker(PoolName),
-    BasicConsume = 
+    BasicConsume =
         case BasicConsumeOrQueueName of
             #'basic.consume'{} = Consume -> Consume;
             Name when is_binary(Name) -> #'basic.consume'{queue = Name}
@@ -99,7 +105,7 @@ subscribe(PoolName0, BasicConsumeOrQueueName, SubsModule, SubsArgs) ->
               subs_module = SubsModule,
               subs_args = SubsArgs
             },
-    {ok, _} = fox_subs_sup:start_subscriber(PoolName, Subs),
+    {ok, _} = fox_subs_sup:start_subscriber(PoolName, Subs, GenServerStartOptions),
     {ok, SubsRef}.
 
 
