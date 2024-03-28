@@ -27,7 +27,7 @@ start_stop_test() ->
            subs_module = sample_subs_callback,
            subs_args = [<<"q1">>, <<"k1">>]
           },
-    {ok, Pid} = fox_subs_worker:start_link(S),
+    {ok, Pid} = fox_subs_worker:start_link(S, []),
     ?assertMatch({status, _}, erlang:process_info(Pid, status)),
 
     ?assertMatch(
@@ -52,11 +52,11 @@ connection_established_test() ->
         subs_module = sample_subs_callback,
         subs_args = [<<"q1">>, <<"k1">>]
     },
-    {ok, Pid} = fox_subs_worker:start_link(S),
+    {ok, Pid} = fox_subs_worker:start_link(S, []),
     fox_subs_worker:connection_established(Pid, Conn),
 
     timer:sleep(200),
-    #subscription{channel = Channel} = sys:get_state(Pid), 
+    #subscription{channel = Channel} = sys:get_state(Pid),
     ?assert(erlang:is_process_alive(Channel)),
 
     fox_subs_worker:stop(Pid),
