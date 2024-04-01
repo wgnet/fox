@@ -55,6 +55,7 @@ init({RegName, ConnParams}) ->
 
 -spec handle_call(gs_request(), gs_from(), gs_reply()) -> gs_call_reply().
 handle_call(stop, _From, #conn_worker_state{connection = Conn, connection_ref = Ref} = State) ->
+    logger:info("~s stop", [worker_name(State)]),
     case Conn of
         undefined -> do_nothing;
         Pid ->
@@ -64,7 +65,7 @@ handle_call(stop, _From, #conn_worker_state{connection = Conn, connection_ref = 
     {stop, normal, ok, State};
 
 handle_call(Any, _From, State) ->
-    logger:error("unknown call ~w in ~p", [Any, ?MODULE]),
+    logger:error("~s unknown call ~w", [worker_name(State), Any]),
     {noreply, State}.
 
 
@@ -72,11 +73,13 @@ handle_call(Any, _From, State) ->
 handle_cast({register_subscriber, Pid},
             #conn_worker_state{connection = Conn, subscribers = Subs} = State
            ) ->
+    logger:info("~s register subscriber", [worker_name(State)]),
     Ref = erlang:monitor(process, Pid),
     fox_subs_worker:connection_established(Pid, Conn),
     {noreply, State#conn_worker_state{subscribers = [{Pid, Ref} | Subs]}};
 
 handle_cast({remove_subscriber, Pid}, #conn_worker_state{subscribers = Subs} = State) ->
+    logger:info("~s remove subscriber", [worker_name(State)]),
     Subs2 = case lists:keyfind(Pid, 1, Subs) of
                 {Pid, Ref} ->
                     erlang:demonitor(Ref, [flush]),
@@ -86,32 +89,41 @@ handle_cast({remove_subscriber, Pid}, #conn_worker_state{subscribers = Subs} = S
     {noreply, State#conn_worker_state{subscribers = Subs2}};
 
 handle_cast(Any, State) ->
-    logger:error("unknown cast ~w in ~p", [Any, ?MODULE]),
+    logger:error("~s unknown cast ~w", [worker_name(State), Any]),
     {noreply, State}.
 
 
 -spec handle_info(gs_request(), gs_state()) -> gs_info_reply().
 handle_info(connect,
     #conn_worker_state{
-        connection = undefined, connection_ref = undefined,
-        connection_params = Params, reconnect_attempt = Attempt,
-        registered_name = RegName, subscribers = Subscribers
+       connection = undefined,
+       connection_ref = undefined,
+       connection_params = Params,
+       reconnect_attempt = Attempt,
+       subscribers = Subscribers
     } = State) ->
     SParams = fox_utils:params_network_to_str(Params),
+    logger:info("~s connect to ~s", [worker_name(State), SParams]),
+
     case amqp_connection:start(Params) of
         {ok, Conn} ->
             Ref = erlang:monitor(process, Conn),
-            logger:notice("~s connected to ~s", [RegName, SParams]),
-            [fox_subs_worker:connection_established(Pid, Conn) || {Pid, _} <- Subscribers],
 
             State2 = State#conn_worker_state{
                 connection = Conn,
                 connection_ref = Ref,
                 reconnect_attempt = 0
             },
+            logger:notice("~s connected to ~s", [worker_name(State2), SParams]),
+
+            [fox_subs_worker:connection_established(Pid, Conn) || {Pid, _} <- Subscribers],
             {noreply, State2};
+
         {error, Reason} ->
-            logger:error("~s could not connect to ~s ~w", [RegName, SParams, Reason]),
+            logger:error(
+              "~s could not connect to ~s ~w",
+              [worker_name(State), SParams, Reason]
+            ),
             fox_priv_utils:reconnect(Attempt),
 
             State2 = State#conn_worker_state{
@@ -126,24 +138,33 @@ handle_info({'DOWN', Ref, process, Conn, Reason},
             #conn_worker_state{
                 connection = Conn,
                 connection_ref = Ref,
-                reconnect_attempt = Attempt,
-                registered_name = RegName
+                reconnect_attempt = Attempt
             } = State) ->
-    fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~w", [RegName, Reason]),
+    fox_priv_utils:error_or_info(
+      Reason,
+      "~s, connection is DOWN: ~w",
+      [worker_name(State), Reason]
+    ),
+
     fox_priv_utils:reconnect(Attempt),
     {noreply, State#conn_worker_state{
                 connection = undefined,
                 connection_ref = undefined}};
 
 handle_info({'DOWN', Ref, process, Pid, Reason},
-            #conn_worker_state{subscribers = Subs, registered_name = RegName} = State) ->
-    fox_priv_utils:error_or_info(Reason, "~s, subscriber is DOWN: ~w", [RegName, Reason]),
+            #conn_worker_state{subscribers = Subs} = State) ->
+    fox_priv_utils:error_or_info(
+      Reason,
+      "~s, subscriber is DOWN: ~w",
+      [worker_name(State), Reason]
+    ),
+
     Subs2 = lists:delete({Pid, Ref}, Subs),
     {noreply, State#conn_worker_state{subscribers = Subs2}};
 
 
 handle_info(Request, State) ->
-    logger:error("unknown info ~w in ~p", [Request, ?MODULE]),
+    logger:error("~s unknown info ~w", [worker_name(State), Request]),
     {noreply, State}.
 
 
@@ -155,3 +176,14 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), term(), term()) -> gs_code_change_reply().
 code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
+
+
+%%% inner functions
+
+worker_name(
+  #conn_worker_state{
+     connection = Conn,
+     registered_name = RegName
+}) ->
+    FullName = io_lib:format("~s/Conn:~p", [RegName, Conn]),
+    unicode:characters_to_binary(FullName).
