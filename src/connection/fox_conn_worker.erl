@@ -48,7 +48,7 @@ init({RegName, ConnParams}) ->
     put('$module', ?MODULE),
     self() ! connect,
     {ok, #conn_worker_state{
-            connection_params = ConnParams, 
+            connection_params = ConnParams,
             registered_name = RegName
            }}.
 
@@ -69,7 +69,7 @@ handle_call(Any, _From, State) ->
 
 
 -spec handle_cast(gs_request(), gs_state()) -> gs_cast_reply().
-handle_cast({register_subscriber, Pid}, 
+handle_cast({register_subscriber, Pid},
             #conn_worker_state{connection = Conn, subscribers = Subs} = State
            ) ->
     Ref = erlang:monitor(process, Pid),
@@ -78,7 +78,7 @@ handle_cast({register_subscriber, Pid},
 
 handle_cast({remove_subscriber, Pid}, #conn_worker_state{subscribers = Subs} = State) ->
     Subs2 = case lists:keyfind(Pid, 1, Subs) of
-                {Pid, Ref} -> 
+                {Pid, Ref} ->
                     erlang:demonitor(Ref, [flush]),
                     lists:delete({Pid, Ref}, Subs);
                 false -> Subs
@@ -132,7 +132,7 @@ handle_info({'DOWN', Ref, process, Conn, Reason},
     fox_priv_utils:error_or_info(Reason, "~s, connection is DOWN: ~w", [RegName, Reason]),
     fox_priv_utils:reconnect(Attempt),
     {noreply, State#conn_worker_state{
-                connection = undefined, 
+                connection = undefined,
                 connection_ref = undefined}};
 
 handle_info({'DOWN', Ref, process, Pid, Reason},

@@ -72,10 +72,14 @@ handle_cast({connection_established, Conn},
         subs_module = Module,
         subs_args = Args}
         = State) ->
+    WorkerName = worker_name(State),
+    logger:info("~s connection_established Conn:~p", [WorkerName, Conn]),
     State2 = unsubscribe(State),
+
     case amqp_connection:open_channel(Conn) of
         {ok, Channel} ->
-            logger:info("~s subscribe to queue", [worker_name(State)]),
+            State3 = State2#subscription{connection = Conn},
+            logger:info("~s subscribe to queue Channel:~p", [worker_name(State3), Channel]),
 
             Ref = erlang:monitor(process, Channel),
             {ok, SubsState} = Module:init(Channel, Args),
@@ -83,20 +87,19 @@ handle_cast({connection_established, Conn},
             #'basic.consume_ok'{consumer_tag = Tag} =
                 amqp_channel:subscribe(Channel, BasicConsume, self()),
 
-            {noreply, State2#subscription{
-                        connection = Conn,
+            {noreply, State3#subscription{
                         channel = Channel,
                         channel_ref = Ref,
                         subs_state = SubsState,
                         subs_tag = Tag}};
         Other ->
-            logger:info("~s can't subscribe to queue, reason: ~w", [worker_name(State), Other]),
+            logger:info("~s can't subscribe to queue, reason: ~w", [WorkerName, Other]),
             {noreply, State2}
     end;
 
 
 handle_cast(Any, State) ->
-    logger:error("unknown cast ~w in ~p", [Any, ?MODULE]),
+    logger:error("~s unknown cast ~w", [worker_name(State), Any]),
     {noreply, State}.
 
 
@@ -111,7 +114,7 @@ handle_info(#'basic.cancel'{} = Msg, State) ->
     {noreply, handle(Msg, State)};
 
 handle_info({'DOWN', _Ref, process, _Channel, normal}, State) ->
-    logger:error("~s channel closed", [worker_name(State)]),
+    logger:error("~s channel has closed", [worker_name(State)]),
     {noreply, State#subscription{channel = undefined, channel_ref = undefined}};
 
 handle_info({'DOWN', Ref, process, Channel, Reason},
@@ -130,7 +133,7 @@ handle_info({'DOWN', Ref, process, Channel, Reason},
     {noreply, State#subscription{channel = undefined, channel_ref = undefined}};
 
 handle_info(Request, State) ->
-    logger:error("unknown info ~w in ~p", [Request, ?MODULE]),
+    logger:error("~s unknown info ~w", [worker_name(State), Request]),
     {noreply, State}.
 
 
@@ -153,16 +156,26 @@ handle(Msg,
         subs_module = Module,
         subs_state = SubsState}
         = State) ->
+    logger:info("~s handle event ~p", [worker_name(State), element(1, Msg)]),
     {ok, SubsState2} = Module:handle(Msg, Channel, SubsState),
     State#subscription{subs_state = SubsState2}.
 
 
 %%% inner functions
 
-worker_name(#subscription{pool_name = PoolName, basic_consume = BasicConsume}) ->
-    #'basic.consume'{queue = Name} = BasicConsume,
-    PoolNameBin = list_to_binary(atom_to_list(PoolName)),
-    <<"fox_subs_worker/", PoolNameBin/binary, "/", Name/binary>>.
+worker_name(
+  #subscription{
+     pool_name = PoolName,
+     connection = Conn,
+     channel = Channel,
+     basic_consume = BasicConsume
+}) ->
+    #'basic.consume'{queue = QueueName} = BasicConsume,
+    FullName = io_lib:format(
+                 "fox_subs_worker/~s/~s/Conn:~p/Channel:~p",
+                 [PoolName, QueueName, Conn, Channel]
+                ),
+    unicode:characters_to_binary(FullName).
 
 unsubscribe(#subscription{channel = undefined} = State) ->
     State;
